@@ -20,26 +20,31 @@ $conn = getDBConnection();
 
 // Check if user is Telecaller - if yes, show only assigned leads
 $isTelecaller = ($userRole == 'Telecaller');
+// Check if user is Site Manager (Analyst) - if yes, show only Site Visit leads
+$isSiteManager = ($userRole == 'Site Manager' || $userRole == 'Analyst');
+
 $assignedFilter = $isTelecaller ? " AND l.assigned_to = $userId" : "";
+$siteVisitFilter = $isSiteManager ? " AND l.status = 'Site Visit'" : "";
+$combinedFilter = $assignedFilter . $siteVisitFilter;
 
 // Fetch Stats
 // Total Leads
-$totalLeadsQuery = "SELECT COUNT(*) as total FROM leads l WHERE 1=1 $assignedFilter";
+$totalLeadsQuery = "SELECT COUNT(*) as total FROM leads l WHERE 1=1 $combinedFilter";
 $totalLeadsResult = $conn->query($totalLeadsQuery);
 $totalLeads = $totalLeadsResult->fetch_assoc()['total'] ?? 0;
 
 // Active Leads
-$activeLeadsQuery = "SELECT COUNT(*) as total FROM leads l WHERE status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') $assignedFilter";
+$activeLeadsQuery = "SELECT COUNT(*) as total FROM leads l WHERE status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') $combinedFilter";
 $activeLeadsResult = $conn->query($activeLeadsQuery);
 $activeLeads = $activeLeadsResult->fetch_assoc()['total'] ?? 0;
 
 // Plots Available (leads interested in plots)
-$plotsQuery = "SELECT COUNT(*) as total FROM leads l WHERE (property_type LIKE '%Plot%' OR property_type LIKE '%plot%') $assignedFilter";
+$plotsQuery = "SELECT COUNT(*) as total FROM leads l WHERE (property_type LIKE '%Plot%' OR property_type LIKE '%plot%') $combinedFilter";
 $plotsResult = $conn->query($plotsQuery);
 $plotsAvailable = $plotsResult->fetch_assoc()['total'] ?? 0;
 
 // Flats Available (leads interested in flats)
-$flatsQuery = "SELECT COUNT(*) as total FROM leads l WHERE (property_type LIKE '%Flat%' OR property_type LIKE '%flat%' OR property_type LIKE '%3BHK%') $assignedFilter";
+$flatsQuery = "SELECT COUNT(*) as total FROM leads l WHERE (property_type LIKE '%Flat%' OR property_type LIKE '%flat%' OR property_type LIKE '%3BHK%') $combinedFilter";
 $flatsResult = $conn->query($flatsQuery);
 $flatsAvailable = $flatsResult->fetch_assoc()['total'] ?? 0;
 
@@ -47,8 +52,8 @@ $flatsAvailable = $flatsResult->fetch_assoc()['total'] ?? 0;
 $currentMonth = date('Y-m');
 $lastMonth = date('Y-m', strtotime('-1 month'));
 
-$currentMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads l WHERE DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$lastMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads l WHERE DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$currentMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads l WHERE DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$lastMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads l WHERE DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 
 $percentageChange = 0;
 if ($lastMonthLeads > 0) {
@@ -59,7 +64,7 @@ if ($lastMonthLeads > 0) {
 $recentLeadsQuery = "SELECT l.*, u.name as telecaller_name 
                      FROM leads l 
                      LEFT JOIN users u ON l.assigned_to = u.id 
-                     WHERE 1=1 $assignedFilter
+                     WHERE 1=1 $combinedFilter
                      ORDER BY l.created_at DESC 
                      LIMIT 5";
 $recentLeadsResult = $conn->query($recentLeadsQuery);

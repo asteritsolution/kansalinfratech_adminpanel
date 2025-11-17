@@ -20,6 +20,8 @@ $conn = getDBConnection();
 
 // Check if user is Telecaller - if yes, show only assigned leads
 $isTelecaller = ($userRole == 'Telecaller');
+// Check if user is Site Manager (Analyst) - if yes, show only Site Visit leads
+$isSiteManager = ($userRole == 'Site Manager' || $userRole == 'Analyst');
 
 // Get filter values from GET/POST
 $filterStatus = $_GET['status'] ?? $_POST['status'] ?? '';
@@ -39,7 +41,13 @@ if ($isTelecaller) {
     $paramTypes .= 'i';
 }
 
-if (!empty($filterStatus)) {
+// If Site Manager, only show Site Visit leads
+if ($isSiteManager) {
+    $whereConditions[] = "l.status = ?";
+    $params[] = 'Site Visit';
+    $paramTypes .= 's';
+} elseif (!empty($filterStatus)) {
+    // Only apply status filter if not Site Manager (Site Manager is already filtered to Site Visit)
     $whereConditions[] = "l.status = ?";
     $params[] = $filterStatus;
     $paramTypes .= 's';
@@ -97,8 +105,13 @@ while ($row = $telecallersResult->fetch_assoc()) {
     $telecallers[] = $row;
 }
 
-// Fetch unique property types for filter (only from assigned leads if telecaller)
-$propertyTypesFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+// Fetch unique property types for filter
+$propertyTypesFilter = "";
+if ($isTelecaller) {
+    $propertyTypesFilter = " AND assigned_to = $userId";
+} elseif ($isSiteManager) {
+    $propertyTypesFilter = " AND status = 'Site Visit'";
+}
 $propertyTypesQuery = "SELECT DISTINCT property_type FROM leads WHERE property_type IS NOT NULL AND property_type != '' $propertyTypesFilter ORDER BY property_type";
 $propertyTypesResult = $conn->query($propertyTypesQuery);
 $propertyTypes = [];
@@ -106,8 +119,13 @@ while ($row = $propertyTypesResult->fetch_assoc()) {
     $propertyTypes[] = $row['property_type'];
 }
 
-// Fetch unique lead sources for filter (only from assigned leads if telecaller)
-$leadSourcesFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+// Fetch unique lead sources for filter
+$leadSourcesFilter = "";
+if ($isTelecaller) {
+    $leadSourcesFilter = " AND assigned_to = $userId";
+} elseif ($isSiteManager) {
+    $leadSourcesFilter = " AND status = 'Site Visit'";
+}
 $leadSourcesQuery = "SELECT DISTINCT lead_source FROM leads WHERE lead_source IS NOT NULL AND lead_source != '' $leadSourcesFilter ORDER BY lead_source";
 $leadSourcesResult = $conn->query($leadSourcesQuery);
 $leadSources = [];
@@ -115,8 +133,13 @@ while ($row = $leadSourcesResult->fetch_assoc()) {
     $leadSources[] = $row['lead_source'];
 }
 
-// Fetch recent timeline activities (last 5 leads created - only assigned if telecaller)
-$timelineFilter = $isTelecaller ? " AND l.assigned_to = $userId" : "";
+// Fetch recent timeline activities (last 5 leads created)
+$timelineFilter = "";
+if ($isTelecaller) {
+    $timelineFilter = " AND l.assigned_to = $userId";
+} elseif ($isSiteManager) {
+    $timelineFilter = " AND l.status = 'Site Visit'";
+}
 $timelineQuery = "SELECT l.*, u.name as created_by_name
                   FROM leads l
                   LEFT JOIN users u ON l.created_by = u.id
@@ -163,6 +186,7 @@ $conn->close();
                     <div class="card-body">
                         <form class="filter-form" method="GET" action="leads-management.php">
                             <div class="filter-row">
+                                <?php if (!$isSiteManager): ?>
                                 <div class="form-group">
                                     <label for="leadStatus">Status</label>
                                     <select id="leadStatus" name="status">
@@ -176,6 +200,13 @@ $conn->close();
                                         <option value="Closed Lost" <?php echo $filterStatus == 'Closed Lost' ? 'selected' : ''; ?>>Closed Lost</option>
                                     </select>
                                 </div>
+                                <?php else: ?>
+                                <div class="form-group">
+                                    <label for="leadStatus">Status</label>
+                                    <input type="text" value="Site Visit" disabled style="background: #f3f4f6; cursor: not-allowed;">
+                                    <small style="color: var(--text-secondary); font-size: 12px;">Site Manager can only view Site Visit leads</small>
+                                </div>
+                                <?php endif; ?>
                                 <div class="form-group">
                                     <label for="leadType">Property Type</label>
                                     <select id="leadType" name="type">
@@ -198,6 +229,7 @@ $conn->close();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php if (!$isTelecaller && !$isSiteManager): ?>
                                 <div class="form-group">
                                     <label for="telecaller">Telecaller</label>
                                     <select id="telecaller" name="telecaller">
@@ -209,6 +241,7 @@ $conn->close();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                             </div>
                             <div class="filter-actions">
                                 <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Apply Filters</button>

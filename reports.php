@@ -17,20 +17,25 @@ $userId = $loggedInUser['id'] ?? 0;
 
 // Check if user is Telecaller - if yes, show only assigned leads
 $isTelecaller = ($userRole == 'Telecaller');
+// Check if user is Site Manager (Analyst) - if yes, show only Site Visit leads
+$isSiteManager = ($userRole == 'Site Manager' || $userRole == 'Analyst');
+
 $assignedFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+$siteVisitFilter = $isSiteManager ? " AND status = 'Site Visit'" : "";
+$combinedFilter = $assignedFilter . $siteVisitFilter;
 
 // Get database connection
 $conn = getDBConnection();
 
 // Calculate Conversion Rate
-$totalLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE 1=1 $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$convertedLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$totalLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE 1=1 $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$convertedLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 $conversionRate = $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0;
 
 // Last month conversion rate for comparison
 $lastMonth = date('Y-m', strtotime('-1 month'));
-$lastMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$lastMonthConverted = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' AND DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$lastMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$lastMonthConverted = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' AND DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 $lastMonthRate = $lastMonthLeads > 0 ? round(($lastMonthConverted / $lastMonthLeads) * 100, 1) : 0;
 $conversionChange = $conversionRate - $lastMonthRate;
 
@@ -38,23 +43,23 @@ $conversionChange = $conversionRate - $lastMonthRate;
 $avgDealSize = 720000; // ₹7.2 L average
 $revenue = $convertedLeads * $avgDealSize;
 $currentMonth = date('Y-m');
-$currentMonthConverted = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' AND DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$currentMonthConverted = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' AND DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 $currentMonthRevenue = $currentMonthConverted * $avgDealSize;
 $lastMonthRevenue = $lastMonthConverted * $avgDealSize;
 $revenueChange = $currentMonthRevenue - $lastMonthRevenue;
 
 // Site Visits Confirmed
-$siteVisits = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$currentMonthSiteVisits = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' AND DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$lastMonthSiteVisits = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' AND DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$siteVisits = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$currentMonthSiteVisits = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' AND DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$lastMonthSiteVisits = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' AND DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 $siteVisitChange = $currentMonthSiteVisits - $lastMonthSiteVisits;
 
 // Conversion Performance by Property Type
 $propertyTypes = ['3BHK Flats', 'Plots', 'Farmhouse'];
 $conversionData = [];
 foreach ($propertyTypes as $type) {
-    $total = $conn->query("SELECT COUNT(*) as total FROM leads WHERE property_type LIKE '%$type%' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-    $converted = $conn->query("SELECT COUNT(*) as total FROM leads WHERE property_type LIKE '%$type%' AND status = 'Converted' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+    $total = $conn->query("SELECT COUNT(*) as total FROM leads WHERE property_type LIKE '%$type%' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+    $converted = $conn->query("SELECT COUNT(*) as total FROM leads WHERE property_type LIKE '%$type%' AND status = 'Converted' $combinedFilter")->fetch_assoc()['total'] ?? 0;
     $rate = $total > 0 ? round(($converted / $total) * 100) : 0;
     $conversionData[$type] = ['total' => $total, 'converted' => $converted, 'rate' => $rate];
 }
@@ -64,19 +69,19 @@ $monthlyData = [];
 for ($i = 5; $i >= 0; $i--) {
     $month = date('Y-m', strtotime("-$i months"));
     $monthName = date('M', strtotime("-$i months"));
-    $count = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+    $count = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month' $combinedFilter")->fetch_assoc()['total'] ?? 0;
     $monthlyData[] = ['month' => $monthName, 'count' => $count];
 }
 $maxLeads = max(array_column($monthlyData, 'count'));
 $maxLeads = $maxLeads > 0 ? $maxLeads : 100; // Prevent division by zero
 
 // Lead Source Breakdown
-$leadSources = $conn->query("SELECT DISTINCT lead_source FROM leads WHERE lead_source IS NOT NULL AND lead_source != '' $assignedFilter");
+$leadSources = $conn->query("SELECT DISTINCT lead_source FROM leads WHERE lead_source IS NOT NULL AND lead_source != '' $combinedFilter");
 $sourceData = [];
 $totalSourceLeads = 0;
 while ($row = $leadSources->fetch_assoc()) {
     $source = $row['lead_source'];
-    $count = $conn->query("SELECT COUNT(*) as total FROM leads WHERE lead_source = '$source' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+    $count = $conn->query("SELECT COUNT(*) as total FROM leads WHERE lead_source = '$source' $combinedFilter")->fetch_assoc()['total'] ?? 0;
     $sourceData[$source] = $count;
     $totalSourceLeads += $count;
 }
@@ -130,10 +135,10 @@ $financialSummary = [];
 for ($i = 3; $i >= 0; $i--) {
     $month = date('Y-m', strtotime("-$i months"));
     $monthName = date('F Y', strtotime("-$i months"));
-    $totalLeadsMonth = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-    $convertedMonth = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' AND DATE_FORMAT(created_at, '%Y-%m') = '$month' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+    $totalLeadsMonth = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+    $convertedMonth = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Converted' AND DATE_FORMAT(created_at, '%Y-%m') = '$month' $combinedFilter")->fetch_assoc()['total'] ?? 0;
     $revenueMonth = $convertedMonth * $avgDealSize;
-    $siteVisitsMonth = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' AND DATE_FORMAT(created_at, '%Y-%m') = '$month' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+    $siteVisitsMonth = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' AND DATE_FORMAT(created_at, '%Y-%m') = '$month' $combinedFilter")->fetch_assoc()['total'] ?? 0;
     $avgDealSizeMonth = $convertedMonth > 0 ? round($revenueMonth / $convertedMonth) : 0;
     
     $financialSummary[] = [
@@ -150,7 +155,7 @@ for ($i = 3; $i >= 0; $i--) {
 $activitiesQuery = "SELECT l.*, u.name as telecaller_name
                     FROM leads l
                     LEFT JOIN users u ON l.assigned_to = u.id
-                    WHERE l.status = 'Converted' $assignedFilter
+                    WHERE l.status = 'Converted' $combinedFilter
                     ORDER BY l.updated_at DESC
                     LIMIT 3";
 $activitiesResult = $conn->query($activitiesQuery);

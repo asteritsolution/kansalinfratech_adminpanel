@@ -262,40 +262,6 @@ $conn->close();
                         </form>
                     </div>
                 </div>
-
-                <div class="content-card">
-                    <div class="card-header">
-                        <h2>Notification Preferences</h2>
-                    </div>
-                    <div class="card-body">
-                        <form class="settings-form">
-                            <div class="toggle-group">
-                                <label class="toggle-item">
-                                    <span><i class="fas fa-envelope"></i> Email Alerts</span>
-                                    <input type="checkbox" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <p>Receive daily summary of new leads and follow-ups.</p>
-                            </div>
-                            <div class="toggle-group">
-                                <label class="toggle-item">
-                                    <span><i class="fas fa-bell"></i> Push Notifications</span>
-                                    <input type="checkbox" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <p>Stay updated with instant telecaller performance alerts.</p>
-                            </div>
-                            <div class="toggle-group">
-                                <label class="toggle-item">
-                                    <span><i class="fas fa-mobile-alt"></i> SMS Alerts</span>
-                                    <input type="checkbox">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <p>Get SMS reminders for upcoming site visits.</p>
-                            </div>
-                        </form>
-                    </div>
-                </div>
             </div>
 
             <div class="content-card">

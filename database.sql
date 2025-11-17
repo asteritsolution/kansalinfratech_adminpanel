@@ -49,3 +49,24 @@ CREATE INDEX idx_lead_status ON leads(status);
 CREATE INDEX idx_lead_assigned ON leads(assigned_to);
 CREATE INDEX idx_lead_created ON leads(created_at);
 
+-- Follow-ups table for tracking conversation history
+CREATE TABLE IF NOT EXISTS follow_ups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    telecaller_id INT NOT NULL,
+    follow_up_date DATE NOT NULL,
+    follow_up_time TIME,
+    notes TEXT,
+    call_duration VARCHAR(20),
+    call_outcome ENUM('Answered', 'No Answer', 'Busy', 'Call Back Later', 'Not Interested', 'Interested') DEFAULT 'Answered',
+    next_follow_up_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (telecaller_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create index for better performance
+CREATE INDEX idx_followup_lead ON follow_ups(lead_id);
+CREATE INDEX idx_followup_telecaller ON follow_ups(telecaller_id);
+CREATE INDEX idx_followup_date ON follow_ups(follow_up_date);
+

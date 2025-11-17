@@ -487,17 +487,12 @@ $conn->close();
                 </div>
             </div>
 
+            <?php if ($userRole == 'Administrator'): ?>
             <div class="content-card">
                 <div class="card-header">
                     <h2>User Directory</h2>
                     <div class="report-actions">
-                        <?php if ($userRole == 'Manager' || $userRole == 'Administrator'): ?>
                         <a href="users.php" class="btn btn-secondary"><i class="fas fa-user-plus"></i> Add User</a>
-                        <?php else: ?>
-                        <span style="color: var(--text-secondary); font-size: 14px;">
-                            <i class="fas fa-info-circle"></i> Only Managers can manage users
-                        </span>
-                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="card-body">
@@ -539,7 +534,6 @@ $conn->close();
                                             <td><?php echo htmlspecialchars($user['email']); ?></td>
                                             <td><?php echo htmlspecialchars($user['phone'] ?? '-'); ?></td>
                                             <td>
-                                                <?php if ($userRole == 'Manager' || $userRole == 'Administrator'): ?>
                                                 <form method="POST" action="users.php" style="display: inline;">
                                                     <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                                     <select class="role-select" name="new_role" onchange="this.form.submit()">
@@ -550,9 +544,6 @@ $conn->close();
                                                     </select>
                                                     <input type="hidden" name="update_role" value="1">
                                                 </form>
-                                                <?php else: ?>
-                                                <span class="badge badge-info"><?php echo htmlspecialchars($user['role']); ?></span>
-                                                <?php endif; ?>
                                             </td>
                                             <td><?php echo htmlspecialchars($user['team'] ?? '-'); ?></td>
                                             <td>
@@ -561,7 +552,6 @@ $conn->close();
                                             <td><?php echo $user['assigned_leads']; ?></td>
                                             <td><?php echo formatDate($user['created_at']); ?></td>
                                             <td class="table-actions">
-                                                <?php if ($userRole == 'Manager' || $userRole == 'Administrator'): ?>
                                                 <form method="POST" action="users.php" style="display: inline;">
                                                     <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                                     <input type="hidden" name="new_status" value="<?php echo $user['status'] == 'Active' ? 'Suspended' : 'Active'; ?>">
@@ -574,9 +564,6 @@ $conn->close();
                                                         <i class="fas fa-trash-alt"></i>
                                                     </a>
                                                 <?php endif; ?>
-                                                <?php else: ?>
-                                                <span style="color: var(--text-secondary); font-size: 12px;">No actions</span>
-                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -586,6 +573,7 @@ $conn->close();
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="content-card">
                 <div class="card-header">

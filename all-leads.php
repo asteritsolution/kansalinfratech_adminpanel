@@ -17,6 +17,8 @@ $userId = $loggedInUser['id'] ?? 0;
 
 // Check if user is Telecaller - if yes, show only assigned leads
 $isTelecaller = ($userRole == 'Telecaller');
+// Check if user is Site Manager (Analyst) - if yes, show only Site Visit leads
+$isSiteManager = ($userRole == 'Site Manager' || $userRole == 'Analyst');
 
 // Get database connection
 $conn = getDBConnection();
@@ -104,6 +106,13 @@ if ($isTelecaller) {
     $paramTypes .= 'i';
 }
 
+// If Site Manager, only show Site Visit leads
+if ($isSiteManager) {
+    $whereConditions[] = "l.status = ?";
+    $params[] = 'Site Visit';
+    $paramTypes .= 's';
+}
+
 if (!empty($filterStatus)) {
     $whereConditions[] = "l.status = ?";
     $params[] = $filterStatus;
@@ -122,8 +131,8 @@ if (!empty($filterSource)) {
     $paramTypes .= 's';
 }
 
-if (!empty($filterTelecaller) && !$isTelecaller) {
-    // Only allow telecaller filter if user is not telecaller
+if (!empty($filterTelecaller) && !$isTelecaller && !$isSiteManager) {
+    // Only allow telecaller filter if user is not telecaller and not Site Manager
     $whereConditions[] = "l.assigned_to = ?";
     $params[] = $filterTelecaller;
     $paramTypes .= 'i';
@@ -137,18 +146,21 @@ if (!empty($filterBudget)) {
 
 $whereClause = !empty($whereConditions) ? "WHERE " . implode(" AND ", $whereConditions) : "";
 
-// Fetch Stats (with telecaller filter)
+// Fetch Stats (with filters)
 $assignedFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
-$totalLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE 1=1 $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$qualifiedLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Qualified' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$followUpLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Follow Up' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$siteVisitLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$siteVisitFilter = $isSiteManager ? " AND status = 'Site Visit'" : "";
+$combinedFilter = $assignedFilter . $siteVisitFilter;
+
+$totalLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE 1=1 $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$qualifiedLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Qualified' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$followUpLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Follow Up' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$siteVisitLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Site Visit' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 
 // Calculate week change
 $thisWeek = date('Y-m-d', strtotime('monday this week'));
 $lastWeek = date('Y-m-d', strtotime('monday last week'));
-$thisWeekCount = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE(created_at) >= '$thisWeek' $assignedFilter")->fetch_assoc()['total'] ?? 0;
-$lastWeekCount = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE(created_at) >= '$lastWeek' AND DATE(created_at) < '$thisWeek' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$thisWeekCount = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE(created_at) >= '$thisWeek' $combinedFilter")->fetch_assoc()['total'] ?? 0;
+$lastWeekCount = $conn->query("SELECT COUNT(*) as total FROM leads WHERE DATE(created_at) >= '$lastWeek' AND DATE(created_at) < '$thisWeek' $combinedFilter")->fetch_assoc()['total'] ?? 0;
 $weekChange = $lastWeekCount > 0 ? round((($thisWeekCount - $lastWeekCount) / $lastWeekCount) * 100) : 0;
 
 // Fetch leads with filters
@@ -181,8 +193,13 @@ while ($row = $telecallersResult->fetch_assoc()) {
     $telecallers[] = $row;
 }
 
-// Fetch unique property types (only from assigned leads if telecaller)
-$propertyTypesFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+// Fetch unique property types
+$propertyTypesFilter = "";
+if ($isTelecaller) {
+    $propertyTypesFilter = " AND assigned_to = $userId";
+} elseif ($isSiteManager) {
+    $propertyTypesFilter = " AND status = 'Site Visit'";
+}
 $propertyTypesQuery = "SELECT DISTINCT property_type FROM leads WHERE property_type IS NOT NULL AND property_type != '' $propertyTypesFilter ORDER BY property_type";
 $propertyTypesResult = $conn->query($propertyTypesQuery);
 $propertyTypes = [];
@@ -190,8 +207,13 @@ while ($row = $propertyTypesResult->fetch_assoc()) {
     $propertyTypes[] = $row['property_type'];
 }
 
-// Fetch unique lead sources (only from assigned leads if telecaller)
-$leadSourcesFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+// Fetch unique lead sources
+$leadSourcesFilter = "";
+if ($isTelecaller) {
+    $leadSourcesFilter = " AND assigned_to = $userId";
+} elseif ($isSiteManager) {
+    $leadSourcesFilter = " AND status = 'Site Visit'";
+}
 $leadSourcesQuery = "SELECT DISTINCT lead_source FROM leads WHERE lead_source IS NOT NULL AND lead_source != '' $leadSourcesFilter ORDER BY lead_source";
 $leadSourcesResult = $conn->query($leadSourcesQuery);
 $leadSources = [];
@@ -380,16 +402,22 @@ $conn->close();
                     </div>
                     <div class="card-body">
                         <div class="chip-group">
+                            <?php if ($isSiteManager): ?>
+                            <span class="chip active" style="background: var(--primary-color); color: white; cursor: default;">
+                                <i class="fas fa-calendar-check"></i> Site Visit Only
+                            </span>
+                            <?php else: ?>
                             <a href="all-leads.php" class="chip <?php echo empty($filterStatus) ? 'active' : ''; ?>"><i class="fas fa-layer-group"></i> All</a>
                             <a href="all-leads.php?status=Qualified" class="chip <?php echo $filterStatus == 'Qualified' ? 'active' : ''; ?>"><i class="fas fa-check-circle"></i> Qualified</a>
                             <a href="all-leads.php?status=Follow Up" class="chip <?php echo $filterStatus == 'Follow Up' ? 'active' : ''; ?>"><i class="fas fa-phone"></i> Follow Up</a>
                             <a href="all-leads.php?status=Site Visit" class="chip <?php echo $filterStatus == 'Site Visit' ? 'active' : ''; ?>"><i class="fas fa-calendar-check"></i> Site Visit</a>
                             <a href="all-leads.php?status=Closed Won" class="chip <?php echo $filterStatus == 'Closed Won' ? 'active' : ''; ?>"><i class="fas fa-file-contract"></i> Closed Won</a>
                             <a href="all-leads.php?status=Closed Lost" class="chip <?php echo $filterStatus == 'Closed Lost' ? 'active' : ''; ?>"><i class="fas fa-times-circle"></i> Closed Lost</a>
+                            <?php endif; ?>
                         </div>
                         <form class="filter-form" method="GET" action="all-leads.php">
                             <div class="filter-row">
-                                <?php if (!$isTelecaller): ?>
+                                <?php if (!$isTelecaller && !$isSiteManager): ?>
                                 <div class="form-group">
                                     <label for="filterTelecaller">Telecaller</label>
                                     <select id="filterTelecaller" name="telecaller">
@@ -400,6 +428,15 @@ $conn->close();
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                </div>
+                                <?php endif; ?>
+                                <?php if ($isSiteManager): ?>
+                                <div class="form-group">
+                                    <label>Status</label>
+                                    <input type="text" value="Site Visit" disabled style="background: #f3f4f6; cursor: not-allowed; padding: 10px; border-radius: 6px;">
+                                    <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
+                                        <i class="fas fa-info-circle"></i> Site Manager can only view Site Visit leads
+                                    </small>
                                 </div>
                                 <?php endif; ?>
                                 <div class="form-group">

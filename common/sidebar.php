@@ -33,6 +33,22 @@ $activePage = isset($activePage) ? $activePage : '';
            <?php 
            $loggedInUser = getLoggedInUser();
            $userRole = $loggedInUser['role'] ?? 'Administrator';
+           if ($userRole == 'Telecaller'): 
+           ?>
+           <li class="<?php echo $activePage === 'assign-leads' ? 'active' : ''; ?>">
+                <a href="assign-leads.php">
+                     <span class="icon"><i class="fas fa-user-friends"></i></span>
+                     <span>Assign Leads</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'follow-ups' ? 'active' : ''; ?>">
+                <a href="follow-ups.php">
+                     <span class="icon"><i class="fas fa-phone-alt"></i></span>
+                     <span>Follow-Ups</span>
+                 </a>
+             </li>
+           <?php endif; ?>
+           <?php 
            if ($userRole == 'Manager'): 
            ?>
            <li class="<?php echo $activePage === 'personal-leads' ? 'active' : ''; ?>">
