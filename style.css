@@ -533,12 +533,14 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 15px;
 }
 
 .card-header h2 {
     font-size: 18px;
     color: var(--text-primary);
     font-weight: 600;
+    flex-shrink: 0;
 }
 
 .view-all-btn {
@@ -910,7 +912,18 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-direction: row;
+    flex-shrink: 0;
+    margin-left: auto;
+    justify-content: flex-end;
+}
+
+.report-actions .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
 }
 
 .chip-group {
