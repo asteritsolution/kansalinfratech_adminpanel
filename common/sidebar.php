@@ -1,4 +1,7 @@
-<?php $activePage = isset($activePage) ? $activePage : ''; ?>
+<?php 
+require_once __DIR__ . '/../config/session.php';
+$activePage = isset($activePage) ? $activePage : ''; 
+?>
 <!-- Sidebar -->
 <aside class="sidebar">
      <div class="sidebar-header">
@@ -27,18 +30,36 @@
                      <span>All Leads</span>
                  </a>
              </li>
+           <?php 
+           $loggedInUser = getLoggedInUser();
+           $userRole = $loggedInUser['role'] ?? 'Administrator';
+           if ($userRole == 'Manager'): 
+           ?>
+           <li class="<?php echo $activePage === 'personal-leads' ? 'active' : ''; ?>">
+                <a href="personal-leads.php">
+                     <span class="icon"><i class="fas fa-user-tie"></i></span>
+                     <span>Personal Leads</span>
+                 </a>
+             </li>
+           <?php endif; ?>
            <li class="<?php echo $activePage === 'reports' ? 'active' : ''; ?>">
             <a href="reports.php">
                      <span class="icon"><i class="fas fa-chart-bar"></i></span>
                      <span>Reports</span>
                  </a>
              </li>
+            <?php 
+            $loggedInUser = getLoggedInUser();
+            $userRole = $loggedInUser['role'] ?? 'Telecaller';
+            if ($userRole == 'Manager' || $userRole == 'Administrator'): 
+            ?>
             <li class="<?php echo $activePage === 'users' ? 'active' : ''; ?>">
                 <a href="users.php">
                      <span class="icon"><i class="fas fa-user-cog"></i></span>
                      <span>Users</span>
                  </a>
              </li>
+            <?php endif; ?>
             <li class="<?php echo $activePage === 'settings' ? 'active' : ''; ?>">
                 <a href="settings.php">
                      <span class="icon"><i class="fas fa-cog"></i></span>

@@ -1,6 +1,14 @@
 <?php
+require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../config/helpers.php';
+
 $pageTitle = isset($pageTitle) ? $pageTitle : 'Dashboard';
 $breadcrumb = isset($breadcrumb) ? $breadcrumb : 'Home / Dashboard';
+
+// Get logged in user data
+$loggedInUser = getLoggedInUser();
+$userName = $loggedInUser ? $loggedInUser['name'] : 'Admin User';
+$userRole = $loggedInUser ? $loggedInUser['role'] : 'Administrator';
 ?>
 <header class="top-header">
     <div class="header-left">
@@ -10,11 +18,13 @@ $breadcrumb = isset($breadcrumb) ? $breadcrumb : 'Home / Dashboard';
     <div class="header-right">
         <div class="user-profile">
             <div class="user-info">
-                <span class="user-name">Admin User</span>
-                <span class="user-role">Administrator</span>
+                <span class="user-name"><?php echo htmlspecialchars($userName); ?></span>
+                <span class="user-role"><?php echo htmlspecialchars($userRole); ?></span>
             </div>
             <div class="user-avatar">
-                <img src="images/user-avatar.png" alt="User Avatar">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px;">
+                    <?php echo getInitials($userName); ?>
+                </div>
             </div>
         </div>
     </div>

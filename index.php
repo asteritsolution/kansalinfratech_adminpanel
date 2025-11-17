@@ -1,7 +1,121 @@
 <?php
+require_once 'config/session.php';
+require_once 'config/database.php';
+require_once 'config/helpers.php';
+
+// Check if user is logged in
+requireLogin();
+
 $activePage = 'dashboard';
 $pageTitle = 'Dashboard';
 $breadcrumb = 'Home / Dashboard';
+
+// Get logged in user
+$loggedInUser = getLoggedInUser();
+$userRole = $loggedInUser['role'] ?? 'Administrator';
+$userId = $loggedInUser['id'] ?? 0;
+
+// Get database connection
+$conn = getDBConnection();
+
+// Check if user is Telecaller - if yes, show only assigned leads
+$isTelecaller = ($userRole == 'Telecaller');
+$assignedFilter = $isTelecaller ? " AND l.assigned_to = $userId" : "";
+
+// Fetch Stats
+// Total Leads
+$totalLeadsQuery = "SELECT COUNT(*) as total FROM leads l WHERE 1=1 $assignedFilter";
+$totalLeadsResult = $conn->query($totalLeadsQuery);
+$totalLeads = $totalLeadsResult->fetch_assoc()['total'] ?? 0;
+
+// Active Leads
+$activeLeadsQuery = "SELECT COUNT(*) as total FROM leads l WHERE status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') $assignedFilter";
+$activeLeadsResult = $conn->query($activeLeadsQuery);
+$activeLeads = $activeLeadsResult->fetch_assoc()['total'] ?? 0;
+
+// Plots Available (leads interested in plots)
+$plotsQuery = "SELECT COUNT(*) as total FROM leads l WHERE (property_type LIKE '%Plot%' OR property_type LIKE '%plot%') $assignedFilter";
+$plotsResult = $conn->query($plotsQuery);
+$plotsAvailable = $plotsResult->fetch_assoc()['total'] ?? 0;
+
+// Flats Available (leads interested in flats)
+$flatsQuery = "SELECT COUNT(*) as total FROM leads l WHERE (property_type LIKE '%Flat%' OR property_type LIKE '%flat%' OR property_type LIKE '%3BHK%') $assignedFilter";
+$flatsResult = $conn->query($flatsQuery);
+$flatsAvailable = $flatsResult->fetch_assoc()['total'] ?? 0;
+
+// Calculate percentage change (comparing this month with last month)
+$currentMonth = date('Y-m');
+$lastMonth = date('Y-m', strtotime('-1 month'));
+
+$currentMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads l WHERE DATE_FORMAT(created_at, '%Y-%m') = '$currentMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+$lastMonthLeads = $conn->query("SELECT COUNT(*) as total FROM leads l WHERE DATE_FORMAT(created_at, '%Y-%m') = '$lastMonth' $assignedFilter")->fetch_assoc()['total'] ?? 0;
+
+$percentageChange = 0;
+if ($lastMonthLeads > 0) {
+    $percentageChange = round((($currentMonthLeads - $lastMonthLeads) / $lastMonthLeads) * 100);
+}
+
+// Fetch Recent Leads (Last 5)
+$recentLeadsQuery = "SELECT l.*, u.name as telecaller_name 
+                     FROM leads l 
+                     LEFT JOIN users u ON l.assigned_to = u.id 
+                     WHERE 1=1 $assignedFilter
+                     ORDER BY l.created_at DESC 
+                     LIMIT 5";
+$recentLeadsResult = $conn->query($recentLeadsQuery);
+$recentLeads = [];
+while ($row = $recentLeadsResult->fetch_assoc()) {
+    $recentLeads[] = $row;
+}
+
+// Fetch Telecaller Performance
+// If telecaller, show only own performance, else show all telecallers
+if ($isTelecaller) {
+    // Show only logged in telecaller's performance
+    $telecallerQuery = "SELECT 
+                        u.id,
+                        u.name,
+                        u.email,
+                        COUNT(l.id) as total_leads,
+                        SUM(CASE WHEN l.status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') THEN 1 ELSE 0 END) as active_leads,
+                        SUM(CASE WHEN l.status = 'Closed Won' THEN 1 ELSE 0 END) as closed_won
+                        FROM users u
+                        LEFT JOIN leads l ON u.id = l.assigned_to
+                        WHERE u.id = $userId
+                        GROUP BY u.id, u.name, u.email";
+} else {
+    // Show all telecallers for admin/manager
+    $telecallerQuery = "SELECT 
+                        u.id,
+                        u.name,
+                        u.email,
+                        COUNT(l.id) as total_leads,
+                        SUM(CASE WHEN l.status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') THEN 1 ELSE 0 END) as active_leads,
+                        SUM(CASE WHEN l.status = 'Closed Won' THEN 1 ELSE 0 END) as closed_won
+                        FROM users u
+                        LEFT JOIN leads l ON u.id = l.assigned_to
+                        WHERE u.role = 'Telecaller' AND u.status = 'Active'
+                        GROUP BY u.id, u.name, u.email
+                        ORDER BY total_leads DESC
+                        LIMIT 5";
+}
+$telecallerResult = $conn->query($telecallerQuery);
+$telecallers = [];
+while ($row = $telecallerResult->fetch_assoc()) {
+    // Calculate performance percentage (based on closed won / total leads)
+    $performance = 0;
+    if ($row['total_leads'] > 0) {
+        $performance = round(($row['closed_won'] / $row['total_leads']) * 100);
+    } else {
+        // If no leads, calculate based on active leads
+        $performance = $row['active_leads'] > 0 ? 50 : 0;
+    }
+    $row['performance'] = $performance;
+    $telecallers[] = $row;
+}
+
+
+$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -33,8 +147,16 @@ $breadcrumb = 'Home / Dashboard';
                     </div>
                     <div class="stat-content">
                         <h3>Total Leads</h3>
-                        <p class="stat-number">1,234</p>
-                        <span class="stat-change positive">+12% from last month</span>
+                        <p class="stat-number"><?php echo number_format($totalLeads); ?></p>
+                        <span class="stat-change <?php echo $percentageChange >= 0 ? 'positive' : ''; ?>">
+                            <?php 
+                            if ($percentageChange != 0) {
+                                echo ($percentageChange >= 0 ? '+' : '') . $percentageChange . '% from last month';
+                            } else {
+                                echo 'No change from last month';
+                            }
+                            ?>
+                        </span>
                     </div>
                 </div>
                 
@@ -44,8 +166,8 @@ $breadcrumb = 'Home / Dashboard';
                     </div>
                     <div class="stat-content">
                         <h3>Active Leads</h3>
-                        <p class="stat-number">856</p>
-                        <span class="stat-change positive">+8% from last month</span>
+                        <p class="stat-number"><?php echo number_format($activeLeads); ?></p>
+                        <span class="stat-change positive">Currently active</span>
                     </div>
                 </div>
                 
@@ -55,7 +177,7 @@ $breadcrumb = 'Home / Dashboard';
                     </div>
                     <div class="stat-content">
                         <h3>Plots Available</h3>
-                        <p class="stat-number">342</p>
+                        <p class="stat-number"><?php echo number_format($plotsAvailable); ?></p>
                         <span class="stat-change">Ready to sell</span>
                     </div>
                 </div>
@@ -66,7 +188,7 @@ $breadcrumb = 'Home / Dashboard';
                     </div>
                     <div class="stat-content">
                         <h3>Flats Available</h3>
-                        <p class="stat-number">128</p>
+                        <p class="stat-number"><?php echo number_format($flatsAvailable); ?></p>
                         <span class="stat-change">3BHK & Others</span>
                     </div>
                 </div>
@@ -78,7 +200,7 @@ $breadcrumb = 'Home / Dashboard';
                 <div class="content-card">
                     <div class="card-header">
                         <h2>Recent Leads</h2>
-                        <a href="#" class="view-all-btn">View All</a>
+                        <a href="all-leads.php" class="view-all-btn">View All</a>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -96,71 +218,30 @@ $breadcrumb = 'Home / Dashboard';
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td>#1001</td>
-                                        <td>Rajesh Kumar</td>
-                                        <td>9876543210</td>
-                                        <td>3BHK Flat</td>
-                                        <td><span class="badge badge-success">Active</span></td>
-                                        <td>Priya Sharma</td>
-                                        <td>2024-01-15</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>#1002</td>
-                                        <td>Sunita Devi</td>
-                                        <td>9876543211</td>
-                                        <td>Plot</td>
-                                        <td><span class="badge badge-warning">Pending</span></td>
-                                        <td>Amit Singh</td>
-                                        <td>2024-01-14</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>#1003</td>
-                                        <td>Vikram Mehta</td>
-                                        <td>9876543212</td>
-                                        <td>Farmhouse</td>
-                                        <td><span class="badge badge-success">Active</span></td>
-                                        <td>Priya Sharma</td>
-                                        <td>2024-01-13</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>#1004</td>
-                                        <td>Anjali Patel</td>
-                                        <td>9876543213</td>
-                                        <td>3BHK Flat</td>
-                                        <td><span class="badge badge-danger">Closed</span></td>
-                                        <td>Rohit Verma</td>
-                                        <td>2024-01-12</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>#1005</td>
-                                        <td>Mohit Agarwal</td>
-                                        <td>9876543214</td>
-                                        <td>Plot</td>
-                                        <td><span class="badge badge-success">Active</span></td>
-                                        <td>Amit Singh</td>
-                                        <td>2024-01-11</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                        </td>
-                                    </tr>
+                                    <?php if (empty($recentLeads)): ?>
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                                <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
+                                                <p>No leads found. <a href="all-leads.php">Add your first lead</a></p>
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($recentLeads as $lead): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($lead['lead_id']); ?></td>
+                                                <td><?php echo htmlspecialchars($lead['name']); ?></td>
+                                                <td><?php echo htmlspecialchars($lead['phone']); ?></td>
+                                                <td><?php echo htmlspecialchars($lead['property_type'] ?? 'N/A'); ?></td>
+                                                <td><span class="badge <?php echo getStatusBadgeClass($lead['status']); ?>"><?php echo htmlspecialchars($lead['status']); ?></span></td>
+                                                <td><?php echo htmlspecialchars($lead['telecaller_name'] ?? 'Unassigned'); ?></td>
+                                                <td><?php echo formatDate($lead['created_at']); ?></td>
+                                                <td>
+                                                    <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                                                    <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -176,36 +257,25 @@ $breadcrumb = 'Home / Dashboard';
                     </div>
                     <div class="card-body">
                         <div class="telecaller-list">
-                            <div class="telecaller-item">
-                                <div class="telecaller-avatar">PS</div>
-                                <div class="telecaller-info">
-                                    <h4>Priya Sharma</h4>
-                                    <p>45 Leads | 12 Active</p>
+                            <?php if (empty($telecallers)): ?>
+                                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    <i class="fas fa-user-tie" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
+                                    <p>No telecallers found. <a href="users.php">Add telecallers</a></p>
                                 </div>
-                                <div class="telecaller-score">
-                                    <span class="score-badge">85%</span>
-                                </div>
-                            </div>
-                            <div class="telecaller-item">
-                                <div class="telecaller-avatar">AS</div>
-                                <div class="telecaller-info">
-                                    <h4>Amit Singh</h4>
-                                    <p>38 Leads | 10 Active</p>
-                                </div>
-                                <div class="telecaller-score">
-                                    <span class="score-badge">78%</span>
-                                </div>
-                            </div>
-                            <div class="telecaller-item">
-                                <div class="telecaller-avatar">RV</div>
-                                <div class="telecaller-info">
-                                    <h4>Rohit Verma</h4>
-                                    <p>32 Leads | 8 Active</p>
-                                </div>
-                                <div class="telecaller-score">
-                                    <span class="score-badge">72%</span>
-                                </div>
-                            </div>
+                            <?php else: ?>
+                                <?php foreach ($telecallers as $telecaller): ?>
+                                    <div class="telecaller-item">
+                                        <div class="telecaller-avatar"><?php echo getInitials($telecaller['name']); ?></div>
+                                        <div class="telecaller-info">
+                                            <h4><?php echo htmlspecialchars($telecaller['name']); ?></h4>
+                                            <p><?php echo $telecaller['total_leads']; ?> Leads | <?php echo $telecaller['active_leads']; ?> Active</p>
+                                        </div>
+                                        <div class="telecaller-score">
+                                            <span class="score-badge"><?php echo $telecaller['performance']; ?>%</span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>

@@ -1,7 +1,136 @@
 <?php
+require_once 'config/session.php';
+require_once 'config/database.php';
+require_once 'config/helpers.php';
+
+// Check if user is logged in
+requireLogin();
+
 $activePage = 'leads';
 $pageTitle = 'Leads Management';
 $breadcrumb = 'Home / Leads Management';
+
+// Get logged in user
+$loggedInUser = getLoggedInUser();
+$userRole = $loggedInUser['role'] ?? 'Administrator';
+$userId = $loggedInUser['id'] ?? 0;
+
+// Get database connection
+$conn = getDBConnection();
+
+// Check if user is Telecaller - if yes, show only assigned leads
+$isTelecaller = ($userRole == 'Telecaller');
+
+// Get filter values from GET/POST
+$filterStatus = $_GET['status'] ?? $_POST['status'] ?? '';
+$filterType = $_GET['type'] ?? $_POST['type'] ?? '';
+$filterSource = $_GET['source'] ?? $_POST['source'] ?? '';
+$filterTelecaller = $_GET['telecaller'] ?? $_POST['telecaller'] ?? '';
+
+// Build WHERE clause for filters
+$whereConditions = [];
+$params = [];
+$paramTypes = '';
+
+// If telecaller, only show assigned leads
+if ($isTelecaller) {
+    $whereConditions[] = "l.assigned_to = ?";
+    $params[] = $userId;
+    $paramTypes .= 'i';
+}
+
+if (!empty($filterStatus)) {
+    $whereConditions[] = "l.status = ?";
+    $params[] = $filterStatus;
+    $paramTypes .= 's';
+}
+
+if (!empty($filterType)) {
+    $whereConditions[] = "l.property_type LIKE ?";
+    $params[] = "%$filterType%";
+    $paramTypes .= 's';
+}
+
+if (!empty($filterSource)) {
+    $whereConditions[] = "l.lead_source = ?";
+    $params[] = $filterSource;
+    $paramTypes .= 's';
+}
+
+if (!empty($filterTelecaller) && !$isTelecaller) {
+    // Only allow telecaller filter if user is not telecaller
+    $whereConditions[] = "l.assigned_to = ?";
+    $params[] = $filterTelecaller;
+    $paramTypes .= 'i';
+}
+
+$whereClause = !empty($whereConditions) ? "WHERE " . implode(" AND ", $whereConditions) : "";
+
+// Fetch leads with filters
+$leadsQuery = "SELECT l.*, u.name as telecaller_name, u2.name as created_by_name
+               FROM leads l
+               LEFT JOIN users u ON l.assigned_to = u.id
+               LEFT JOIN users u2 ON l.created_by = u2.id
+               $whereClause
+               ORDER BY l.created_at DESC
+               LIMIT 50";
+
+if (!empty($params)) {
+    $stmt = $conn->prepare($leadsQuery);
+    $stmt->bind_param($paramTypes, ...$params);
+    $stmt->execute();
+    $leadsResult = $stmt->get_result();
+} else {
+    $leadsResult = $conn->query($leadsQuery);
+}
+
+$leads = [];
+while ($row = $leadsResult->fetch_assoc()) {
+    $leads[] = $row;
+}
+
+// Fetch all telecallers for filter dropdown
+$telecallersQuery = "SELECT id, name FROM users WHERE role = 'Telecaller' AND status = 'Active' ORDER BY name";
+$telecallersResult = $conn->query($telecallersQuery);
+$telecallers = [];
+while ($row = $telecallersResult->fetch_assoc()) {
+    $telecallers[] = $row;
+}
+
+// Fetch unique property types for filter (only from assigned leads if telecaller)
+$propertyTypesFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+$propertyTypesQuery = "SELECT DISTINCT property_type FROM leads WHERE property_type IS NOT NULL AND property_type != '' $propertyTypesFilter ORDER BY property_type";
+$propertyTypesResult = $conn->query($propertyTypesQuery);
+$propertyTypes = [];
+while ($row = $propertyTypesResult->fetch_assoc()) {
+    $propertyTypes[] = $row['property_type'];
+}
+
+// Fetch unique lead sources for filter (only from assigned leads if telecaller)
+$leadSourcesFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
+$leadSourcesQuery = "SELECT DISTINCT lead_source FROM leads WHERE lead_source IS NOT NULL AND lead_source != '' $leadSourcesFilter ORDER BY lead_source";
+$leadSourcesResult = $conn->query($leadSourcesQuery);
+$leadSources = [];
+while ($row = $leadSourcesResult->fetch_assoc()) {
+    $leadSources[] = $row['lead_source'];
+}
+
+// Fetch recent timeline activities (last 5 leads created - only assigned if telecaller)
+$timelineFilter = $isTelecaller ? " AND l.assigned_to = $userId" : "";
+$timelineQuery = "SELECT l.*, u.name as created_by_name
+                  FROM leads l
+                  LEFT JOIN users u ON l.created_by = u.id
+                  WHERE 1=1 $timelineFilter
+                  ORDER BY l.created_at DESC
+                  LIMIT 5";
+$timelineResult = $conn->query($timelineQuery);
+$timelineActivities = [];
+while ($row = $timelineResult->fetch_assoc()) {
+    $timelineActivities[] = $row;
+}
+
+
+$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -29,53 +158,61 @@ $breadcrumb = 'Home / Leads Management';
                 <div class="content-card">
                     <div class="card-header">
                         <h2>Lead Filters</h2>
-                        <a href="#" class="view-all-btn">Reset Filters</a>
+                        <a href="leads-management.php" class="view-all-btn">Reset Filters</a>
                     </div>
                     <div class="card-body">
-                        <form class="filter-form">
+                        <form class="filter-form" method="GET" action="leads-management.php">
                             <div class="filter-row">
                                 <div class="form-group">
                                     <label for="leadStatus">Status</label>
-                                    <select id="leadStatus">
+                                    <select id="leadStatus" name="status">
                                         <option value="">All Status</option>
-                                        <option value="new">New</option>
-                                        <option value="active">Active</option>
-                                        <option value="followup">Follow Up</option>
-                                        <option value="closed">Closed</option>
+                                        <option value="New" <?php echo $filterStatus == 'New' ? 'selected' : ''; ?>>New</option>
+                                        <option value="Active" <?php echo $filterStatus == 'Active' ? 'selected' : ''; ?>>Active</option>
+                                        <option value="Follow Up" <?php echo $filterStatus == 'Follow Up' ? 'selected' : ''; ?>>Follow Up</option>
+                                        <option value="Qualified" <?php echo $filterStatus == 'Qualified' ? 'selected' : ''; ?>>Qualified</option>
+                                        <option value="Site Visit" <?php echo $filterStatus == 'Site Visit' ? 'selected' : ''; ?>>Site Visit</option>
+                                        <option value="Closed Won" <?php echo $filterStatus == 'Closed Won' ? 'selected' : ''; ?>>Closed Won</option>
+                                        <option value="Closed Lost" <?php echo $filterStatus == 'Closed Lost' ? 'selected' : ''; ?>>Closed Lost</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="leadType">Property Type</label>
-                                    <select id="leadType">
+                                    <select id="leadType" name="type">
                                         <option value="">All Types</option>
-                                        <option value="plot">Plot</option>
-                                        <option value="flat">3BHK Flat</option>
-                                        <option value="farmhouse">Farmhouse</option>
+                                        <?php foreach ($propertyTypes as $type): ?>
+                                            <option value="<?php echo htmlspecialchars($type); ?>" <?php echo $filterType == $type ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($type); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="leadSource">Lead Source</label>
-                                    <select id="leadSource">
+                                    <select id="leadSource" name="source">
                                         <option value="">All Sources</option>
-                                        <option value="website">Website</option>
-                                        <option value="social">Social Media</option>
-                                        <option value="referral">Referral</option>
-                                        <option value="walkin">Walk-in</option>
+                                        <?php foreach ($leadSources as $source): ?>
+                                            <option value="<?php echo htmlspecialchars($source); ?>" <?php echo $filterSource == $source ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($source); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="telecaller">Telecaller</label>
-                                    <select id="telecaller">
+                                    <select id="telecaller" name="telecaller">
                                         <option value="">All Telecallers</option>
-                                        <option value="priya">Priya Sharma</option>
-                                        <option value="amit">Amit Singh</option>
-                                        <option value="rohit">Rohit Verma</option>
+                                        <?php foreach ($telecallers as $telecaller): ?>
+                                            <option value="<?php echo $telecaller['id']; ?>" <?php echo $filterTelecaller == $telecaller['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($telecaller['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                             </div>
                             <div class="filter-actions">
                                 <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Apply Filters</button>
-                                <button type="button" class="btn btn-secondary"><i class="fas fa-file-export"></i> Export Leads</button>
+                                <a href="leads-management.php" class="btn btn-secondary"><i class="fas fa-redo"></i> Reset</a>
                             </div>
                         </form>
                     </div>
@@ -84,7 +221,7 @@ $breadcrumb = 'Home / Leads Management';
                 <div class="content-card">
                     <div class="card-header">
                         <h2>Leads Overview</h2>
-                        <a href="#" class="view-all-btn">Create Lead</a>
+                        <a href="all-leads.php" class="view-all-btn">Create Lead</a>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -102,48 +239,45 @@ $breadcrumb = 'Home / Leads Management';
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td>#L-2045</td>
-                                        <td>Ananya Gupta</td>
-                                        <td>+91 98765 32010</td>
-                                        <td>Priya Sharma</td>
-                                        <td>3BHK Flat</td>
-                                        <td><span class="badge badge-warning">Follow Up</span></td>
-                                        <td>16 Jan 2024</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                            <button class="btn-icon" title="Notes"><i class="fas fa-sticky-note"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>#L-2046</td>
-                                        <td>Rahul Mehta</td>
-                                        <td>+91 98765 32011</td>
-                                        <td>Amit Singh</td>
-                                        <td>Premium Plot</td>
-                                        <td><span class="badge badge-success">Active</span></td>
-                                        <td>15 Jan 2024</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                            <button class="btn-icon" title="Notes"><i class="fas fa-sticky-note"></i></button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>#L-2047</td>
-                                        <td>Sneha Patel</td>
-                                        <td>+91 98765 32012</td>
-                                        <td>Rohit Verma</td>
-                                        <td>Farmhouse</td>
-                                        <td><span class="badge badge-danger">Closed</span></td>
-                                        <td>12 Jan 2024</td>
-                                        <td>
-                                            <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                            <button class="btn-icon" title="Notes"><i class="fas fa-sticky-note"></i></button>
-                                        </td>
-                                    </tr>
+                                    <?php if (empty($leads)): ?>
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                                <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
+                                                <p>No leads found. 
+                                                    <?php if (!empty($filterStatus) || !empty($filterType) || !empty($filterSource) || !empty($filterTelecaller)): ?>
+                                                        <a href="leads-management.php">Clear filters</a> or 
+                                                    <?php endif; ?>
+                                                    <a href="all-leads.php">Add your first lead</a>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($leads as $lead): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($lead['lead_id']); ?></td>
+                                                <td><?php echo htmlspecialchars($lead['name']); ?></td>
+                                                <td>
+                                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                        <span><i class="fas fa-phone"></i> <?php echo htmlspecialchars($lead['phone']); ?></span>
+                                                        <?php if (!empty($lead['email'])): ?>
+                                                            <span style="font-size: 12px; color: var(--text-secondary);">
+                                                                <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($lead['email']); ?>
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($lead['telecaller_name'] ?? 'Unassigned'); ?></td>
+                                                <td><?php echo htmlspecialchars($lead['property_type'] ?? 'N/A'); ?></td>
+                                                <td><span class="badge <?php echo getStatusBadgeClass($lead['status']); ?>"><?php echo htmlspecialchars($lead['status']); ?></span></td>
+                                                <td><?php echo formatDate($lead['follow_up_date']); ?></td>
+                                                <td>
+                                                    <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
+                                                    <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
+                                                    <button class="btn-icon" title="Notes"><i class="fas fa-sticky-note"></i></button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -153,34 +287,31 @@ $breadcrumb = 'Home / Leads Management';
 
             <div class="content-card">
                 <div class="card-header">
-                    <h2>Lead Timeline</h2>
+                    <h2>Recent Lead Activities</h2>
                 </div>
                 <div class="card-body">
                     <ul class="timeline">
-                        <li>
-                            <div class="timeline-icon success"><i class="fas fa-plus"></i></div>
-                            <div class="timeline-content">
-                                <h4>Lead Created</h4>
-                                <p>Lead #L-2045 added by Priya Sharma.</p>
-                                <span>15 Jan 2024 - 10:30 AM</span>
-                            </div>
-                        </li>
-                        <li>
-                            <div class="timeline-icon info"><i class="fas fa-phone-alt"></i></div>
-                            <div class="timeline-content">
-                                <h4>Call Scheduled</h4>
-                                <p>Follow-up call scheduled with Ananya Gupta.</p>
-                                <span>15 Jan 2024 - 11:00 AM</span>
-                            </div>
-                        </li>
-                        <li>
-                            <div class="timeline-icon warning"><i class="fas fa-user-clock"></i></div>
-                            <div class="timeline-content">
-                                <h4>Reminder</h4>
-                                <p>Reminder set for telecaller to share property brochure.</p>
-                                <span>14 Jan 2024 - 05:00 PM</span>
-                            </div>
-                        </li>
+                        <?php if (empty($timelineActivities)): ?>
+                            <li style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                <i class="fas fa-history" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
+                                <p>No recent activities found.</p>
+                            </li>
+                        <?php else: ?>
+                            <?php foreach ($timelineActivities as $activity): ?>
+                                <li>
+                                    <div class="timeline-icon success"><i class="fas fa-plus"></i></div>
+                                    <div class="timeline-content">
+                                        <h4>Lead Created</h4>
+                                        <p>Lead <?php echo htmlspecialchars($activity['lead_id']); ?> - <?php echo htmlspecialchars($activity['name']); ?> 
+                                            <?php if (!empty($activity['created_by_name'])): ?>
+                                                added by <?php echo htmlspecialchars($activity['created_by_name']); ?>
+                                            <?php endif; ?>
+                                        </p>
+                                        <span><?php echo formatDateTime($activity['created_at']); ?></span>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </ul>
                 </div>
             </div>
