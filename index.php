@@ -25,7 +25,8 @@ $isSiteManager = ($userRole == 'Site Manager' || $userRole == 'Analyst');
 
 $assignedFilter = $isTelecaller ? " AND l.assigned_to = $userId" : "";
 $siteVisitFilter = $isSiteManager ? " AND l.status = 'Site Visit'" : "";
-$combinedFilter = $assignedFilter . $siteVisitFilter;
+$personalLeadsFilter = " AND (l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')";
+$combinedFilter = $assignedFilter . $siteVisitFilter . $personalLeadsFilter;
 
 // Fetch Stats
 // Total Leads
@@ -85,7 +86,8 @@ if ($isTelecaller) {
                         SUM(CASE WHEN l.status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') THEN 1 ELSE 0 END) as active_leads,
                         SUM(CASE WHEN l.status = 'Closed Won' THEN 1 ELSE 0 END) as closed_won
                         FROM users u
-                        LEFT JOIN leads l ON u.id = l.assigned_to
+                        LEFT JOIN leads l ON u.id = l.assigned_to 
+                        AND (l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')
                         WHERE u.id = $userId
                         GROUP BY u.id, u.name, u.email";
 } else {
@@ -98,7 +100,8 @@ if ($isTelecaller) {
                         SUM(CASE WHEN l.status IN ('Active', 'Follow Up', 'Qualified', 'Site Visit') THEN 1 ELSE 0 END) as active_leads,
                         SUM(CASE WHEN l.status = 'Closed Won' THEN 1 ELSE 0 END) as closed_won
                         FROM users u
-                        LEFT JOIN leads l ON u.id = l.assigned_to
+                        LEFT JOIN leads l ON u.id = l.assigned_to 
+                        AND (l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')
                         WHERE u.role = 'Telecaller' AND u.status = 'Active'
                         GROUP BY u.id, u.name, u.email
                         ORDER BY total_leads DESC
@@ -119,17 +122,18 @@ while ($row = $telecallerResult->fetch_assoc()) {
     $telecallers[] = $row;
 }
 
-// Fetch recent timeline activities (last 5 leads created)
+// Fetch recent timeline activities (last 5 leads created) - exclude personal leads
 $timelineFilter = "";
 if ($isTelecaller) {
     $timelineFilter = " AND l.assigned_to = $userId";
 } elseif ($isSiteManager) {
     $timelineFilter = " AND l.status = 'Site Visit'";
 }
+$personalLeadsFilterTimeline = " AND (l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')";
 $timelineQuery = "SELECT l.*, u.name as created_by_name
                   FROM leads l
                   LEFT JOIN users u ON l.created_by = u.id
-                  WHERE 1=1 $timelineFilter
+                  WHERE 1=1 $timelineFilter $personalLeadsFilterTimeline
                   ORDER BY l.created_at DESC
                   LIMIT 5";
 $timelineResult = $conn->query($timelineQuery);
@@ -267,6 +271,7 @@ $conn->close();
                 </div>
             </div>
             
+            <?php if ($userRole != 'Site Manager' && $userRole != 'Analyst'): ?>
             <!-- Team Performance -->
             <div class="content-grid">
                 <div class="content-card">
@@ -332,6 +337,7 @@ $conn->close();
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
         </main>
     </div>
 </body>

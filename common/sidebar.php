@@ -18,12 +18,20 @@ $activePage = isset($activePage) ? $activePage : '';
                      <span>Dashboard</span>
                  </a>
              </li>
+           <?php 
+           $loggedInUser = getLoggedInUser();
+           $userRole = $loggedInUser['role'] ?? 'Administrator';
+           if ($userRole != 'Telecaller'): 
+           ?>
            <li class="<?php echo $activePage === 'all-leads' ? 'active' : ''; ?>">
                 <a href="all-leads.php">
                      <span class="icon"><i class="fas fa-address-card"></i></span>
                      <span>All Leads</span>
                  </a>
              </li>
+           <?php 
+           if ($userRole != 'Site Manager' && $userRole != 'Analyst'): 
+           ?>
            <li class="<?php echo $activePage === 'add-leads' ? 'active' : ''; ?>">
                 <a href="add-leads.php">
                      <span class="icon"><i class="fas fa-plus-circle"></i></span>
@@ -42,6 +50,8 @@ $activePage = isset($activePage) ? $activePage : '';
                      <span>Unassigned Leads</span>
                  </a>
              </li>
+           <?php endif; ?>
+           <?php endif; ?>
            <?php 
            $loggedInUser = getLoggedInUser();
            $userRole = $loggedInUser['role'] ?? 'Administrator';
@@ -50,13 +60,25 @@ $activePage = isset($activePage) ? $activePage : '';
            <li class="<?php echo $activePage === 'assign-leads' ? 'active' : ''; ?>">
                 <a href="assign-leads.php">
                      <span class="icon"><i class="fas fa-user-friends"></i></span>
-                     <span>Assign Leads</span>
+                     <span>Transfer Leads</span>
                  </a>
              </li>
            <li class="<?php echo $activePage === 'follow-ups' ? 'active' : ''; ?>">
                 <a href="follow-ups.php">
                      <span class="icon"><i class="fas fa-phone-alt"></i></span>
                      <span>Follow-Ups</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'client-followups' ? 'active' : ''; ?>">
+                <a href="client-followups.php">
+                     <span class="icon"><i class="fas fa-history"></i></span>
+                     <span>Client Follow-Ups</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'transfer-leads' ? 'active' : ''; ?>">
+                <a href="transfer-leads.php">
+                     <span class="icon"><i class="fas fa-exchange-alt"></i></span>
+                     <span>Transfer Leads</span>
                  </a>
              </li>
            <?php endif; ?>
@@ -70,12 +92,18 @@ $activePage = isset($activePage) ? $activePage : '';
                  </a>
              </li>
            <?php endif; ?>
+           <?php 
+           $loggedInUser = getLoggedInUser();
+           $userRole = $loggedInUser['role'] ?? 'Administrator';
+           if ($userRole != 'Telecaller' && $userRole != 'Site Manager' && $userRole != 'Analyst'): 
+           ?>
            <li class="<?php echo $activePage === 'reports' ? 'active' : ''; ?>">
             <a href="reports.php">
                      <span class="icon"><i class="fas fa-chart-bar"></i></span>
                      <span>Reports</span>
                  </a>
              </li>
+           <?php endif; ?>
             <?php 
             $loggedInUser = getLoggedInUser();
             $userRole = $loggedInUser['role'] ?? 'Telecaller';
@@ -85,6 +113,12 @@ $activePage = isset($activePage) ? $activePage : '';
                 <a href="users.php">
                      <span class="icon"><i class="fas fa-user-cog"></i></span>
                      <span>Users</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'add-user' ? 'active' : ''; ?>">
+                <a href="add-user.php">
+                     <span class="icon"><i class="fas fa-user-plus"></i></span>
+                     <span>Add User</span>
                  </a>
              </li>
             <?php endif; ?>

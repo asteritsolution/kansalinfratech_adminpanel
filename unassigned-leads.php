@@ -15,6 +15,12 @@ $loggedInUser = getLoggedInUser();
 $userRole = $loggedInUser['role'] ?? 'Administrator';
 $userId = $loggedInUser['id'] ?? 0;
 
+// Telecallers and Site Managers cannot access this page
+if ($userRole == 'Telecaller' || $userRole == 'Site Manager' || $userRole == 'Analyst') {
+    header("Location: index.php");
+    exit();
+}
+
 // Get database connection
 $conn = getDBConnection();
 
@@ -153,11 +159,12 @@ if (isset($_GET['success'])) {
     }
 }
 
-// Fetch unassigned leads
+// Fetch unassigned leads - exclude personal leads
 $leadsQuery = "SELECT l.*, u2.name as created_by_name
                FROM leads l
                LEFT JOIN users u2 ON l.created_by = u2.id
-               WHERE l.assigned_to IS NULL
+               WHERE l.assigned_to IS NULL 
+               AND (l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')
                ORDER BY l.created_at DESC
                LIMIT 100";
 
@@ -192,8 +199,10 @@ while ($row = $leadSourcesResult->fetch_assoc()) {
 }
 
 // Get stats
-$totalUnassigned = $conn->query("SELECT COUNT(*) as total FROM leads WHERE assigned_to IS NULL")->fetch_assoc()['total'] ?? 0;
-$activeUnassigned = $conn->query("SELECT COUNT(*) as total FROM leads WHERE assigned_to IS NULL AND status IN ('Active', 'Follow Up', 'Qualified')")->fetch_assoc()['total'] ?? 0;
+// Exclude personal leads from stats
+$personalLeadsFilter = " AND (created_by IS NULL OR (SELECT role FROM users WHERE id = leads.created_by) != 'Manager')";
+$totalUnassigned = $conn->query("SELECT COUNT(*) as total FROM leads WHERE assigned_to IS NULL $personalLeadsFilter")->fetch_assoc()['total'] ?? 0;
+$activeUnassigned = $conn->query("SELECT COUNT(*) as total FROM leads WHERE assigned_to IS NULL AND status IN ('Active', 'Follow Up', 'Qualified') $personalLeadsFilter")->fetch_assoc()['total'] ?? 0;
 
 $conn->close();
 ?>

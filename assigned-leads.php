@@ -15,6 +15,12 @@ $loggedInUser = getLoggedInUser();
 $userRole = $loggedInUser['role'] ?? 'Administrator';
 $userId = $loggedInUser['id'] ?? 0;
 
+// Telecallers and Site Managers cannot access this page
+if ($userRole == 'Telecaller' || $userRole == 'Site Manager' || $userRole == 'Analyst') {
+    header("Location: index.php");
+    exit();
+}
+
 // Get database connection
 $conn = getDBConnection();
 
@@ -117,8 +123,11 @@ if (isset($_GET['success'])) {
     }
 }
 
-// Build WHERE clause - only show assigned leads
-$whereConditions = ["l.assigned_to IS NOT NULL"];
+// Build WHERE clause - only show assigned leads, exclude personal leads
+$whereConditions = [
+    "l.assigned_to IS NOT NULL",
+    "(l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')"
+];
 $params = [];
 $paramTypes = '';
 

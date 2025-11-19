@@ -15,6 +15,12 @@ $loggedInUser = getLoggedInUser();
 $userRole = $loggedInUser['role'] ?? 'Administrator';
 $userId = $loggedInUser['id'] ?? 0;
 
+// Telecallers and Site Managers cannot access this page
+if ($userRole == 'Telecaller' || $userRole == 'Site Manager' || $userRole == 'Analyst') {
+    header("Location: index.php");
+    exit();
+}
+
 // Check if user is Telecaller - if yes, show only assigned leads
 $isTelecaller = ($userRole == 'Telecaller');
 // Check if user is Site Manager (Analyst) - if yes, show only Site Visit leads
@@ -22,7 +28,8 @@ $isSiteManager = ($userRole == 'Site Manager' || $userRole == 'Analyst');
 
 $assignedFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
 $siteVisitFilter = $isSiteManager ? " AND status = 'Site Visit'" : "";
-$combinedFilter = $assignedFilter . $siteVisitFilter;
+$personalLeadsFilter = " AND (created_by IS NULL OR (SELECT role FROM users WHERE id = leads.created_by) != 'Manager')";
+$combinedFilter = $assignedFilter . $siteVisitFilter . $personalLeadsFilter;
 
 // Get database connection
 $conn = getDBConnection();
@@ -149,19 +156,6 @@ for ($i = 3; $i >= 0; $i--) {
         'avg_deal' => $avgDealSizeMonth,
         'site_visits' => $siteVisitsMonth
     ];
-}
-
-// Activity Highlights (Recent converted leads and important activities)
-$activitiesQuery = "SELECT l.*, u.name as telecaller_name
-                    FROM leads l
-                    LEFT JOIN users u ON l.assigned_to = u.id
-                    WHERE l.status = 'Converted' $combinedFilter
-                    ORDER BY l.updated_at DESC
-                    LIMIT 3";
-$activitiesResult = $conn->query($activitiesQuery);
-$activities = [];
-while ($row = $activitiesResult->fetch_assoc()) {
-    $activities[] = $row;
 }
 
 $conn->close();
@@ -389,33 +383,6 @@ $conn->close();
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-
-            <div class="content-card">
-                <div class="card-header">
-                    <h2>Activity Highlights</h2>
-                </div>
-                <div class="card-body">
-                    <ul class="timeline">
-                        <?php if (empty($activities)): ?>
-                            <li style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                                <i class="fas fa-handshake" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
-                                <p>No recent activities found.</p>
-                            </li>
-                        <?php else: ?>
-                            <?php foreach ($activities as $activity): ?>
-                                <li>
-                                    <div class="timeline-icon success"><i class="fas fa-handshake"></i></div>
-                                    <div class="timeline-content">
-                                        <h4>Deal closed for <?php echo htmlspecialchars($activity['property_type'] ?? 'Property'); ?></h4>
-                                        <p><?php echo htmlspecialchars($activity['telecaller_name'] ?? 'Unknown'); ?> closed new <?php echo htmlspecialchars($activity['property_type'] ?? 'property'); ?> sale.</p>
-                                        <span><?php echo formatDate($activity['updated_at']); ?></span>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </ul>
                 </div>
             </div>
         </main>

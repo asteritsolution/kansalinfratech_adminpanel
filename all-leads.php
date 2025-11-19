@@ -82,9 +82,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_lead'])) {
     }
 }
 
+// Handle Status Update (for Site Managers only)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status']) && $isSiteManager) {
+    $leadId = (int)$_POST['lead_id'];
+    $status = trim($_POST['status'] ?? '');
+    
+    // Validate status - only allow "Closed Won" or "Closed Lost"
+    if ($status != 'Closed Won' && $status != 'Closed Lost') {
+        $error = 'Invalid status. Only "Closed Won" or "Closed Lost" are allowed.';
+    } else {
+        // Check permission - Site Manager can only update leads assigned to them
+        $verifyQuery = $conn->prepare("SELECT id FROM leads WHERE id = ? AND assigned_to = ?");
+        $verifyQuery->bind_param("ii", $leadId, $userId);
+        $verifyQuery->execute();
+        $verifyResult = $verifyQuery->get_result();
+        
+        if ($verifyResult->num_rows > 0) {
+            // Update status
+            $stmt = $conn->prepare("UPDATE leads SET status = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->bind_param("si", $status, $leadId);
+            
+            if ($stmt->execute()) {
+                $success = 'Lead status updated successfully to ' . $status . '!';
+                header("Location: all-leads.php?success=status");
+                exit();
+            } else {
+                $error = 'Error updating lead status: ' . $conn->error;
+            }
+            
+            $stmt->close();
+        } else {
+            $error = 'You do not have permission to update this lead.';
+        }
+        
+        $verifyQuery->close();
+    }
+}
+
 // Check for success message
-if (isset($_GET['success']) && $_GET['success'] == 1) {
-    $success = 'Lead added successfully!';
+if (isset($_GET['success'])) {
+    if ($_GET['success'] == 1) {
+        $success = 'Lead added successfully!';
+    } elseif ($_GET['success'] == 'status') {
+        $success = 'Lead status updated successfully!';
+    }
 }
 
 // Get filter values
@@ -99,6 +140,9 @@ $whereConditions = [];
 $params = [];
 $paramTypes = '';
 
+// Exclude personal leads (leads created by Managers) - only show in personal-leads.php
+$whereConditions[] = "(l.created_by IS NULL OR (SELECT role FROM users WHERE id = l.created_by) != 'Manager')";
+
 // If telecaller, only show assigned leads
 if ($isTelecaller) {
     $whereConditions[] = "l.assigned_to = ?";
@@ -106,8 +150,11 @@ if ($isTelecaller) {
     $paramTypes .= 'i';
 }
 
-// If Site Manager, only show Site Visit leads
+// If Site Manager, only show leads assigned to them with Site Visit status
 if ($isSiteManager) {
+    $whereConditions[] = "l.assigned_to = ?";
+    $params[] = $userId;
+    $paramTypes .= 'i';
     $whereConditions[] = "l.status = ?";
     $params[] = 'Site Visit';
     $paramTypes .= 's';
@@ -146,10 +193,11 @@ if (!empty($filterBudget)) {
 
 $whereClause = !empty($whereConditions) ? "WHERE " . implode(" AND ", $whereConditions) : "";
 
-// Fetch Stats (with filters)
+// Fetch Stats (with filters) - exclude personal leads
 $assignedFilter = $isTelecaller ? " AND assigned_to = $userId" : "";
-$siteVisitFilter = $isSiteManager ? " AND status = 'Site Visit'" : "";
-$combinedFilter = $assignedFilter . $siteVisitFilter;
+$siteVisitFilter = $isSiteManager ? " AND assigned_to = $userId AND status = 'Site Visit'" : "";
+$personalLeadsFilter = " AND (created_by IS NULL OR (SELECT role FROM users WHERE id = leads.created_by) != 'Manager')";
+$combinedFilter = $assignedFilter . $siteVisitFilter . $personalLeadsFilter;
 
 $totalLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE 1=1 $combinedFilter")->fetch_assoc()['total'] ?? 0;
 $qualifiedLeads = $conn->query("SELECT COUNT(*) as total FROM leads WHERE status = 'Qualified' $combinedFilter")->fetch_assoc()['total'] ?? 0;
@@ -198,7 +246,7 @@ $propertyTypesFilter = "";
 if ($isTelecaller) {
     $propertyTypesFilter = " AND assigned_to = $userId";
 } elseif ($isSiteManager) {
-    $propertyTypesFilter = " AND status = 'Site Visit'";
+    $propertyTypesFilter = " AND assigned_to = $userId AND status = 'Site Visit'";
 }
 $propertyTypesQuery = "SELECT DISTINCT property_type FROM leads WHERE property_type IS NOT NULL AND property_type != '' $propertyTypesFilter ORDER BY property_type";
 $propertyTypesResult = $conn->query($propertyTypesQuery);
@@ -212,7 +260,7 @@ $leadSourcesFilter = "";
 if ($isTelecaller) {
     $leadSourcesFilter = " AND assigned_to = $userId";
 } elseif ($isSiteManager) {
-    $leadSourcesFilter = " AND status = 'Site Visit'";
+    $leadSourcesFilter = " AND assigned_to = $userId AND status = 'Site Visit'";
 }
 $leadSourcesQuery = "SELECT DISTINCT lead_source FROM leads WHERE lead_source IS NOT NULL AND lead_source != '' $leadSourcesFilter ORDER BY lead_source";
 $leadSourcesResult = $conn->query($leadSourcesQuery);
@@ -320,12 +368,15 @@ $conn->close();
                                     <th>Status</th>
                                     <th>Source</th>
                                     <th>Follow Up</th>
+                                    <?php if ($isSiteManager): ?>
+                                    <th>Actions</th>
+                                    <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($leads)): ?>
                                     <tr>
-                                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                        <td colspan="<?php echo $isSiteManager ? 9 : 8; ?>" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                                             <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
                                             <p>No leads found. 
                                                 <?php if (!empty($filterStatus) || !empty($filterType) || !empty($filterSource) || !empty($filterTelecaller)): ?>
@@ -353,6 +404,13 @@ $conn->close();
                                             <td><span class="badge <?php echo getStatusBadgeClass($lead['status']); ?>"><?php echo htmlspecialchars($lead['status']); ?></span></td>
                                             <td><?php echo htmlspecialchars($lead['lead_source'] ?? 'N/A'); ?></td>
                                             <td><?php echo formatDate($lead['follow_up_date']); ?></td>
+                                            <?php if ($isSiteManager): ?>
+                                            <td class="table-actions">
+                                                <button class="btn btn-sm btn-primary" onclick="openStatusModal(<?php echo $lead['id']; ?>, '<?php echo htmlspecialchars($lead['lead_id']); ?>', '<?php echo htmlspecialchars($lead['name']); ?>', '<?php echo htmlspecialchars($lead['status']); ?>')" title="Update Status">
+                                                    <i class="fas fa-edit"></i> Update Status
+                                                </button>
+                                            </td>
+                                            <?php endif; ?>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
@@ -363,5 +421,72 @@ $conn->close();
             </div>
         </main>
     </div>
+
+    <?php if ($isSiteManager): ?>
+    <!-- Status Update Modal -->
+    <div id="statusModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Update Lead Status</h2>
+                <span class="close" onclick="closeStatusModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="all-leads.php" id="statusForm">
+                    <input type="hidden" name="lead_id" id="status_lead_id">
+                    <input type="hidden" name="update_status" value="1">
+                    
+                    <div class="form-group">
+                        <label><strong>Lead ID:</strong> <span id="status_lead_id_display"></span></label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>Lead Name:</strong> <span id="status_lead_name_display"></span></label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>Current Status:</strong> <span id="status_current_status_display"></span></label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="status_select">Update Status to *</label>
+                        <select id="status_select" name="status" required>
+                            <option value="">Select Status</option>
+                            <option value="Closed Won">Closed Won</option>
+                            <option value="Closed Lost">Closed Lost</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeStatusModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Status</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openStatusModal(leadId, leadIdDisplay, leadName, currentStatus) {
+            document.getElementById('status_lead_id').value = leadId;
+            document.getElementById('status_lead_id_display').textContent = leadIdDisplay;
+            document.getElementById('status_lead_name_display').textContent = leadName;
+            document.getElementById('status_current_status_display').textContent = currentStatus;
+            document.getElementById('status_select').value = '';
+            document.getElementById('statusModal').style.display = 'block';
+        }
+        
+        function closeStatusModal() {
+            document.getElementById('statusModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            var modal = document.getElementById('statusModal');
+            if (event.target == modal) {
+                closeStatusModal();
+            }
+        }
+    </script>
+    <?php endif; ?>
 </body>
 </html>

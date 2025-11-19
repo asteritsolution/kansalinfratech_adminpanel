@@ -15,6 +15,12 @@ $loggedInUser = getLoggedInUser();
 $userRole = $loggedInUser['role'] ?? 'Administrator';
 $userId = $loggedInUser['id'] ?? 0;
 
+// Telecallers and Site Managers cannot access this page
+if ($userRole == 'Telecaller' || $userRole == 'Site Manager' || $userRole == 'Analyst') {
+    header("Location: index.php");
+    exit();
+}
+
 // Get database connection
 $conn = getDBConnection();
 

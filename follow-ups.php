@@ -55,7 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_followup'])) {
         if ($stmt->execute()) {
             // Update lead's follow_up_date and status
             $updateLead = $conn->prepare("UPDATE leads SET follow_up_date = ?, status = 'Follow Up', updated_at = NOW() WHERE id = ?");
-            $updateLead->bind_param("si", $nextFollowUpDateFormatted ? $nextFollowUpDateFormatted : $followUpDate, $leadId);
+            $finalFollowUpDate = $nextFollowUpDateFormatted ? $nextFollowUpDateFormatted : $followUpDate;
+            $updateLead->bind_param("si", $finalFollowUpDate, $leadId);
             $updateLead->execute();
             $updateLead->close();
             
@@ -212,19 +213,6 @@ while ($row = $leadsResult->fetch_assoc()) {
     $assignedLeads[] = $row;
 }
 
-// Fetch past follow-ups (last 30 days)
-$pastQuery = "SELECT fu.*, l.lead_id, l.name as lead_name, l.phone, l.property_type
-              FROM follow_ups fu
-              INNER JOIN leads l ON fu.lead_id = l.id
-              WHERE fu.telecaller_id = $userId 
-              AND fu.follow_up_date < '$today'
-              ORDER BY fu.follow_up_date DESC, fu.follow_up_time DESC
-              LIMIT 50";
-$pastResult = $conn->query($pastQuery);
-$pastFollowUps = [];
-while ($row = $pastResult->fetch_assoc()) {
-    $pastFollowUps[] = $row;
-}
 
 // Helper function to format time
 function formatTime($time) {
@@ -496,51 +484,6 @@ $conn->close();
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-
-            <div class="content-card">
-                <div class="card-header">
-                    <h2>Past Follow-Ups (Last 30 Days)</h2>
-                    <a href="#" class="view-all-btn">View All History</a>
-                </div>
-                <div class="card-body">
-                    <ul class="timeline">
-                        <?php if (empty($pastFollowUps)): ?>
-                            <li style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                                <i class="fas fa-history" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
-                                <p>No past follow-ups found.</p>
-                            </li>
-                        <?php else: ?>
-                            <?php foreach ($pastFollowUps as $followUp): ?>
-                                <li>
-                                    <div class="timeline-icon <?php echo $followUp['call_outcome'] == 'Interested' ? 'success' : ($followUp['call_outcome'] == 'Not Interested' ? 'danger' : 'info'); ?>">
-                                        <i class="fas fa-phone"></i>
-                                    </div>
-                                    <div class="timeline-content">
-                                        <h4>
-                                            <?php echo htmlspecialchars($followUp['lead_name']); ?> 
-                                            <span style="color: var(--text-secondary); font-weight: normal;">
-                                                (<?php echo htmlspecialchars($followUp['lead_id']); ?>)
-                                            </span>
-                                        </h4>
-                                        <p><strong>Outcome:</strong> <?php echo htmlspecialchars($followUp['call_outcome']); ?> 
-                                            <?php if (!empty($followUp['call_duration'])): ?>
-                                                · <strong>Duration:</strong> <?php echo htmlspecialchars($followUp['call_duration']); ?>
-                                            <?php endif; ?>
-                                        </p>
-                                        <p><?php echo nl2br(htmlspecialchars($followUp['notes'] ?? 'No notes')); ?></p>
-                                        <?php if (!empty($followUp['next_follow_up_date'])): ?>
-                                            <p style="color: var(--primary-color); margin-top: 5px;">
-                                                <i class="fas fa-calendar"></i> Next follow-up: <?php echo formatDate($followUp['next_follow_up_date']); ?>
-                                            </p>
-                                        <?php endif; ?>
-                                        <span><?php echo formatDate($followUp['follow_up_date']); ?> <?php echo formatTime($followUp['follow_up_time']); ?></span>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </ul>
                 </div>
             </div>
         </main>

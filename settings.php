@@ -124,41 +124,6 @@ $userResult = $userQuery->get_result();
 $currentUser = $userResult->fetch_assoc();
 $userQuery->close();
 
-// Fetch telecallers with their assigned leads
-$telecallersQuery = "SELECT u.*, 
-                     COUNT(l.id) as assigned_leads
-                     FROM users u
-                     LEFT JOIN leads l ON l.assigned_to = u.id
-                     WHERE u.role = 'Telecaller'
-                     GROUP BY u.id, u.name, u.email, u.phone, u.role, u.team, u.status, u.created_at
-                     ORDER BY u.name ASC";
-$telecallersResult = $conn->query($telecallersQuery);
-$telecallers = [];
-while ($row = $telecallersResult->fetch_assoc()) {
-    $telecallers[] = $row;
-}
-
-
-function getAccessLevel($assignedLeads) {
-    if ($assignedLeads > 40) {
-        return 'Full';
-    } elseif ($assignedLeads > 20) {
-        return 'Standard';
-    } else {
-        return 'Limited';
-    }
-}
-
-function getAccessBadgeClass($accessLevel) {
-    if ($accessLevel == 'Full') {
-        return 'badge-success';
-    } elseif ($accessLevel == 'Standard') {
-        return 'badge-info';
-    } else {
-        return 'badge-warning';
-    }
-}
-
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -260,64 +225,6 @@ $conn->close();
                                 <button type="submit" name="update_password" class="btn btn-primary"><i class="fas fa-key"></i> Update Password</button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="content-card">
-                <div class="card-header">
-                    <h2>Telecaller Access Control</h2>
-                    <a href="users.php" class="view-all-btn">Manage Roles</a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Telecaller</th>
-                                    <th>Email</th>
-                                    <th>Assigned Leads</th>
-                                    <th>Access Level</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($telecallers)): ?>
-                                    <tr>
-                                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                                            <i class="fas fa-user-tie" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
-                                            <p>No telecallers found. <a href="users.php">Add telecallers</a></p>
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($telecallers as $tc): 
-                                        $accessLevel = getAccessLevel($tc['assigned_leads']);
-                                    ?>
-                                        <tr>
-                                            <td>
-                                                <div class="table-user">
-                                                    <div class="avatar-circle"><?php echo getInitials($tc['name']); ?></div>
-                                                    <div>
-                                                        <h4><?php echo htmlspecialchars($tc['name']); ?></h4>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($tc['email']); ?></td>
-                                            <td><?php echo $tc['assigned_leads']; ?></td>
-                                            <td><span class="badge <?php echo getAccessBadgeClass($accessLevel); ?>"><?php echo $accessLevel; ?></span></td>
-                                            <td><span class="badge <?php echo getStatusBadgeClass($tc['status']); ?>"><?php echo htmlspecialchars($tc['status']); ?></span></td>
-                                            <td>
-                                                <a href="users.php?id=<?php echo $tc['id']; ?>" class="btn-icon" title="Edit Access"><i class="fas fa-user-cog"></i></a>
-                                                <a href="users.php?status=<?php echo $tc['status'] == 'Active' ? 'Suspended' : 'Active'; ?>&user_id=<?php echo $tc['id']; ?>" class="btn-icon" title="<?php echo $tc['status'] == 'Active' ? 'Deactivate' : 'Activate'; ?>">
-                                                    <i class="fas fa-<?php echo $tc['status'] == 'Active' ? 'user-slash' : 'user-check'; ?>"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
