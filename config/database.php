@@ -1,9 +1,26 @@
 <?php
-// Database Configuration
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'kansaladminpanel');
+// Database Configuration - Auto-detect environment
+// Check if running on localhost
+$isLocalhost = (
+    $_SERVER['HTTP_HOST'] == 'localhost' || 
+    $_SERVER['HTTP_HOST'] == '127.0.0.1' || 
+    strpos($_SERVER['HTTP_HOST'], 'localhost:') !== false ||
+    strpos($_SERVER['HTTP_HOST'], '127.0.0.1:') !== false
+);
+
+if ($isLocalhost) {
+    // Local Development Credentials
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('DB_NAME', 'kansaladminpanel');
+} else {
+    // Live Server Credentials
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'u380087641_kansaladmin');
+    define('DB_PASS', 'P!y^;$M*5m+');
+    define('DB_NAME', 'u380087641_kansaladmin');
+}
 
 // Create database connection
 function getDBConnection() {

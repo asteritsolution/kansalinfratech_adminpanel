@@ -119,6 +119,24 @@ while ($row = $telecallerResult->fetch_assoc()) {
     $telecallers[] = $row;
 }
 
+// Fetch recent timeline activities (last 5 leads created)
+$timelineFilter = "";
+if ($isTelecaller) {
+    $timelineFilter = " AND l.assigned_to = $userId";
+} elseif ($isSiteManager) {
+    $timelineFilter = " AND l.status = 'Site Visit'";
+}
+$timelineQuery = "SELECT l.*, u.name as created_by_name
+                  FROM leads l
+                  LEFT JOIN users u ON l.created_by = u.id
+                  WHERE 1=1 $timelineFilter
+                  ORDER BY l.created_at DESC
+                  LIMIT 5";
+$timelineResult = $conn->query($timelineQuery);
+$timelineActivities = [];
+while ($row = $timelineResult->fetch_assoc()) {
+    $timelineActivities[] = $row;
+}
 
 $conn->close();
 ?>
@@ -219,13 +237,12 @@ $conn->close();
                                         <th>Status</th>
                                         <th>Telecaller</th>
                                         <th>Date</th>
-                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($recentLeads)): ?>
                                         <tr>
-                                            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                                                 <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
                                                 <p>No leads found. <a href="all-leads.php">Add your first lead</a></p>
                                             </td>
@@ -240,10 +257,6 @@ $conn->close();
                                                 <td><span class="badge <?php echo getStatusBadgeClass($lead['status']); ?>"><?php echo htmlspecialchars($lead['status']); ?></span></td>
                                                 <td><?php echo htmlspecialchars($lead['telecaller_name'] ?? 'Unassigned'); ?></td>
                                                 <td><?php echo formatDate($lead['created_at']); ?></td>
-                                                <td>
-                                                    <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                                    <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                                </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -282,6 +295,40 @@ $conn->close();
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Lead Activities -->
+            <div class="content-grid">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2>Recent Lead Activities</h2>
+                    </div>
+                    <div class="card-body">
+                        <ul class="timeline">
+                            <?php if (empty($timelineActivities)): ?>
+                                <li style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    <i class="fas fa-history" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
+                                    <p>No recent activities found.</p>
+                                </li>
+                            <?php else: ?>
+                                <?php foreach ($timelineActivities as $activity): ?>
+                                    <li>
+                                        <div class="timeline-icon success"><i class="fas fa-plus"></i></div>
+                                        <div class="timeline-content">
+                                            <h4>Lead Created</h4>
+                                            <p>Lead <?php echo htmlspecialchars($activity['lead_id']); ?> - <?php echo htmlspecialchars($activity['name']); ?> 
+                                                <?php if (!empty($activity['created_by_name'])): ?>
+                                                    added by <?php echo htmlspecialchars($activity['created_by_name']); ?>
+                                                <?php endif; ?>
+                                            </p>
+                                            <span><?php echo formatDateTime($activity['created_at']); ?></span>
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </ul>
                     </div>
                 </div>
             </div>

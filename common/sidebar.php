@@ -18,16 +18,28 @@ $activePage = isset($activePage) ? $activePage : '';
                      <span>Dashboard</span>
                  </a>
              </li>
-           <li class="<?php echo $activePage === 'leads' ? 'active' : ''; ?>">
-                <a href="leads-management.php">
-                     <span class="icon"><i class="fas fa-users"></i></span>
-                     <span>Leads Management</span>
-                 </a>
-             </li>
            <li class="<?php echo $activePage === 'all-leads' ? 'active' : ''; ?>">
                 <a href="all-leads.php">
                      <span class="icon"><i class="fas fa-address-card"></i></span>
                      <span>All Leads</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'add-leads' ? 'active' : ''; ?>">
+                <a href="add-leads.php">
+                     <span class="icon"><i class="fas fa-plus-circle"></i></span>
+                     <span>Add Leads</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'assigned-leads' ? 'active' : ''; ?>">
+                <a href="assigned-leads.php">
+                     <span class="icon"><i class="fas fa-user-check"></i></span>
+                     <span>Assigned Leads</span>
+                 </a>
+             </li>
+           <li class="<?php echo $activePage === 'unassigned-leads' ? 'active' : ''; ?>">
+                <a href="unassigned-leads.php">
+                     <span class="icon"><i class="fas fa-user-times"></i></span>
+                     <span>Unassigned Leads</span>
                  </a>
              </li>
            <?php 

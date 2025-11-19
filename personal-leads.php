@@ -360,15 +360,10 @@ $conn->close();
                                     <label for="leadType">Interested In</label>
                                     <select id="leadType" name="leadType">
                                         <option value="">Select Property Type</option>
-                                        <?php foreach ($propertyTypes as $type): ?>
-                                            <option value="<?php echo htmlspecialchars($type); ?>" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == $type) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($type); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                        <option value="3BHK Flat" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == '3BHK Flat') ? 'selected' : ''; ?>>3BHK Flat</option>
-                                        <option value="Luxury Villa" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Luxury Villa') ? 'selected' : ''; ?>>Luxury Villa</option>
-                                        <option value="Farmhouse Plot" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Farmhouse Plot') ? 'selected' : ''; ?>>Farmhouse Plot</option>
-                                        <option value="Commercial Plot" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Commercial Plot') ? 'selected' : ''; ?>>Commercial Plot</option>
+                                        <option value="1 Acre + Farmhouse" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == '1 Acre + Farmhouse') ? 'selected' : ''; ?>>1 Acre + Farmhouse</option>
+                                        <option value="Luxury 3BHK Flat" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Luxury 3BHK Flat') ? 'selected' : ''; ?>>Luxury 3BHK Flat</option>
+                                        <option value="Luxury 4BHK Flat" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Luxury 4BHK Flat') ? 'selected' : ''; ?>>Luxury 4BHK Flat</option>
+                                        <option value="Luxury 5BHK Flat" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Luxury 5BHK Flat') ? 'selected' : ''; ?>>Luxury 5BHK Flat</option>
                                     </select>
                                 </div>
                             </div>

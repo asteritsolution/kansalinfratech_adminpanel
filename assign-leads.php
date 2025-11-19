@@ -410,7 +410,7 @@ $conn->close();
                                     <tr>
                                         <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                                             <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
-                                            <p>No leads assigned to you. <a href="leads-management.php">View all leads</a></p>
+                                            <p>No leads assigned to you. <a href="all-leads.php">View all leads</a></p>
                                         </td>
                                     </tr>
                                 <?php else: ?>
@@ -461,7 +461,7 @@ $conn->close();
                                                 <?php endif; ?>
                                             </td>
                                             <td class="table-actions">
-                                                <a href="leads-management.php?id=<?php echo $lead['id']; ?>" class="btn-icon" title="View Details">
+                                                <a href="all-leads.php" class="btn-icon" title="View Details">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
                                             </td>

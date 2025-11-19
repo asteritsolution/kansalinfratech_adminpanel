@@ -303,196 +303,9 @@ $conn->close();
                 </div>
             </div>
 
-            <div class="content-grid">
-                <?php if (!$isTelecaller): ?>
-                <div class="content-card">
-                    <div class="card-header">
-                        <h2>Add New Lead</h2>
-                        <a href="#" class="view-all-btn"><i class="fas fa-cloud-upload-alt"></i> Import Leads</a>
-                    </div>
-                    <div class="card-body">
-                        <form class="settings-form" method="POST" action="all-leads.php">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="leadName">Lead Name <span style="color: red;">*</span></label>
-                                    <input type="text" id="leadName" name="leadName" placeholder="Enter full name" value="<?php echo htmlspecialchars($_POST['leadName'] ?? ''); ?>" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="leadPhone">Phone Number <span style="color: red;">*</span></label>
-                                    <input type="text" id="leadPhone" name="leadPhone" placeholder="+91 98xxxxxxx" value="<?php echo htmlspecialchars($_POST['leadPhone'] ?? ''); ?>" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="leadEmail">Email</label>
-                                    <input type="email" id="leadEmail" name="leadEmail" placeholder="name@example.com" value="<?php echo htmlspecialchars($_POST['leadEmail'] ?? ''); ?>">
-                                </div>
-                                <div class="form-group">
-                                    <label for="leadType">Interested In</label>
-                                    <select id="leadType" name="leadType">
-                                        <option value="">Select Property Type</option>
-                                        <?php foreach ($propertyTypes as $type): ?>
-                                            <option value="<?php echo htmlspecialchars($type); ?>" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == $type) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($type); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                        <option value="3BHK Flat" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == '3BHK Flat') ? 'selected' : ''; ?>>3BHK Flat</option>
-                                        <option value="Luxury Villa" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Luxury Villa') ? 'selected' : ''; ?>>Luxury Villa</option>
-                                        <option value="Farmhouse Plot" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Farmhouse Plot') ? 'selected' : ''; ?>>Farmhouse Plot</option>
-                                        <option value="Commercial Plot" <?php echo (isset($_POST['leadType']) && $_POST['leadType'] == 'Commercial Plot') ? 'selected' : ''; ?>>Commercial Plot</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="leadSource">Lead Source</label>
-                                    <select id="leadSource" name="leadSource">
-                                        <option value="">Select Source</option>
-                                        <?php foreach ($leadSources as $source): ?>
-                                            <option value="<?php echo htmlspecialchars($source); ?>" <?php echo (isset($_POST['leadSource']) && $_POST['leadSource'] == $source) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($source); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                        <option value="Website" <?php echo (isset($_POST['leadSource']) && $_POST['leadSource'] == 'Website') ? 'selected' : ''; ?>>Website</option>
-                                        <option value="Facebook Ads" <?php echo (isset($_POST['leadSource']) && $_POST['leadSource'] == 'Facebook Ads') ? 'selected' : ''; ?>>Facebook Ads</option>
-                                        <option value="Google Ads" <?php echo (isset($_POST['leadSource']) && $_POST['leadSource'] == 'Google Ads') ? 'selected' : ''; ?>>Google Ads</option>
-                                        <option value="WhatsApp Campaign" <?php echo (isset($_POST['leadSource']) && $_POST['leadSource'] == 'WhatsApp Campaign') ? 'selected' : ''; ?>>WhatsApp Campaign</option>
-                                        <option value="Referral" <?php echo (isset($_POST['leadSource']) && $_POST['leadSource'] == 'Referral') ? 'selected' : ''; ?>>Referral</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="leadOwner">Assign To</label>
-                                    <select id="leadOwner" name="leadOwner">
-                                        <option value="">Unassigned</option>
-                                        <?php foreach ($telecallers as $telecaller): ?>
-                                            <option value="<?php echo $telecaller['id']; ?>" <?php echo (isset($_POST['leadOwner']) && $_POST['leadOwner'] == $telecaller['id']) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($telecaller['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="leadBudget">Budget Range</label>
-                                    <input type="text" id="leadBudget" name="leadBudget" placeholder="₹50L - ₹1.5Cr" value="<?php echo htmlspecialchars($_POST['leadBudget'] ?? ''); ?>">
-                                </div>
-                                <div class="form-group">
-                                    <label for="followUpDate">Next Follow Up</label>
-                                    <input type="date" id="followUpDate" name="followUpDate" value="<?php echo htmlspecialchars($_POST['followUpDate'] ?? ''); ?>">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="leadNotes">Notes</label>
-                                <textarea id="leadNotes" name="leadNotes" rows="3" placeholder="Add brief notes about this lead"><?php echo htmlspecialchars($_POST['leadNotes'] ?? ''); ?></textarea>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" name="add_lead" class="btn btn-primary"><i class="fas fa-save"></i> Save Lead</button>
-                                <button type="reset" class="btn btn-secondary"><i class="fas fa-undo"></i> Clear</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <div class="content-card">
-                    <div class="card-header">
-                        <h2>Lead Filters</h2>
-                        <a href="all-leads.php" class="view-all-btn">Reset Filters</a>
-                    </div>
-                    <div class="card-body">
-                        <div class="chip-group">
-                            <?php if ($isSiteManager): ?>
-                            <span class="chip active" style="background: var(--primary-color); color: white; cursor: default;">
-                                <i class="fas fa-calendar-check"></i> Site Visit Only
-                            </span>
-                            <?php else: ?>
-                            <a href="all-leads.php" class="chip <?php echo empty($filterStatus) ? 'active' : ''; ?>"><i class="fas fa-layer-group"></i> All</a>
-                            <a href="all-leads.php?status=Qualified" class="chip <?php echo $filterStatus == 'Qualified' ? 'active' : ''; ?>"><i class="fas fa-check-circle"></i> Qualified</a>
-                            <a href="all-leads.php?status=Follow Up" class="chip <?php echo $filterStatus == 'Follow Up' ? 'active' : ''; ?>"><i class="fas fa-phone"></i> Follow Up</a>
-                            <a href="all-leads.php?status=Site Visit" class="chip <?php echo $filterStatus == 'Site Visit' ? 'active' : ''; ?>"><i class="fas fa-calendar-check"></i> Site Visit</a>
-                            <a href="all-leads.php?status=Closed Won" class="chip <?php echo $filterStatus == 'Closed Won' ? 'active' : ''; ?>"><i class="fas fa-file-contract"></i> Closed Won</a>
-                            <a href="all-leads.php?status=Closed Lost" class="chip <?php echo $filterStatus == 'Closed Lost' ? 'active' : ''; ?>"><i class="fas fa-times-circle"></i> Closed Lost</a>
-                            <?php endif; ?>
-                        </div>
-                        <form class="filter-form" method="GET" action="all-leads.php">
-                            <div class="filter-row">
-                                <?php if (!$isTelecaller && !$isSiteManager): ?>
-                                <div class="form-group">
-                                    <label for="filterTelecaller">Telecaller</label>
-                                    <select id="filterTelecaller" name="telecaller">
-                                        <option value="">All Telecallers</option>
-                                        <?php foreach ($telecallers as $telecaller): ?>
-                                            <option value="<?php echo $telecaller['id']; ?>" <?php echo $filterTelecaller == $telecaller['id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($telecaller['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <?php endif; ?>
-                                <?php if ($isSiteManager): ?>
-                                <div class="form-group">
-                                    <label>Status</label>
-                                    <input type="text" value="Site Visit" disabled style="background: #f3f4f6; cursor: not-allowed; padding: 10px; border-radius: 6px;">
-                                    <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
-                                        <i class="fas fa-info-circle"></i> Site Manager can only view Site Visit leads
-                                    </small>
-                                </div>
-                                <?php endif; ?>
-                                <div class="form-group">
-                                    <label for="filterType">Property Type</label>
-                                    <select id="filterType" name="type">
-                                        <option value="">All Types</option>
-                                        <?php foreach ($propertyTypes as $type): ?>
-                                            <option value="<?php echo htmlspecialchars($type); ?>" <?php echo $filterType == $type ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($type); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="filterSource">Lead Source</label>
-                                    <select id="filterSource" name="source">
-                                        <option value="">All Sources</option>
-                                        <?php foreach ($leadSources as $source): ?>
-                                            <option value="<?php echo htmlspecialchars($source); ?>" <?php echo $filterSource == $source ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($source); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="filterStatus">Status</label>
-                                    <select id="filterStatus" name="status">
-                                        <option value="">All Status</option>
-                                        <option value="New" <?php echo $filterStatus == 'New' ? 'selected' : ''; ?>>New</option>
-                                        <option value="Active" <?php echo $filterStatus == 'Active' ? 'selected' : ''; ?>>Active</option>
-                                        <option value="Follow Up" <?php echo $filterStatus == 'Follow Up' ? 'selected' : ''; ?>>Follow Up</option>
-                                        <option value="Qualified" <?php echo $filterStatus == 'Qualified' ? 'selected' : ''; ?>>Qualified</option>
-                                        <option value="Site Visit" <?php echo $filterStatus == 'Site Visit' ? 'selected' : ''; ?>>Site Visit</option>
-                                        <option value="Closed Won" <?php echo $filterStatus == 'Closed Won' ? 'selected' : ''; ?>>Closed Won</option>
-                                        <option value="Closed Lost" <?php echo $filterStatus == 'Closed Lost' ? 'selected' : ''; ?>>Closed Lost</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="filter-actions">
-                                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Apply Filters</button>
-                                <a href="all-leads.php" class="btn btn-secondary"><i class="fas fa-redo"></i> Reset</a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
             <div class="content-card">
                 <div class="card-header">
                     <h2>Lead List</h2>
-                    <div class="report-actions">
-                        <a href="leads-management.php" class="btn btn-secondary"><i class="fas fa-filter"></i> Advanced Filters</a>
-                        <?php if (!$isTelecaller): ?>
-                        <a href="all-leads.php" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Add New Lead</a>
-                        <?php endif; ?>
-                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -507,13 +320,12 @@ $conn->close();
                                     <th>Status</th>
                                     <th>Source</th>
                                     <th>Follow Up</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($leads)): ?>
                                     <tr>
-                                        <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                                             <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 10px; opacity: 0.3;"></i>
                                             <p>No leads found. 
                                                 <?php if (!empty($filterStatus) || !empty($filterType) || !empty($filterSource) || !empty($filterTelecaller)): ?>
@@ -541,11 +353,6 @@ $conn->close();
                                             <td><span class="badge <?php echo getStatusBadgeClass($lead['status']); ?>"><?php echo htmlspecialchars($lead['status']); ?></span></td>
                                             <td><?php echo htmlspecialchars($lead['lead_source'] ?? 'N/A'); ?></td>
                                             <td><?php echo formatDate($lead['follow_up_date']); ?></td>
-                                            <td class="table-actions">
-                                                <button class="btn-icon" title="View"><i class="fas fa-eye"></i></button>
-                                                <button class="btn-icon" title="Edit"><i class="fas fa-edit"></i></button>
-                                                <button class="btn-icon" title="Call"><i class="fas fa-phone-alt"></i></button>
-                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
